@@ -1,4 +1,5 @@
 import logging
+import netaddr
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -20,17 +21,12 @@ class VRFListView(RethinkAPIMixin, generics.ListCreateAPIView):
     pk_field = 'id'
     slug_field = 'vrf'
     serializer_class = VRFSerializer
-    group_filter_fields = []
     permission_classes = (permissions.IsAuthenticated, IsAdminForUpdate)
-
-    def get_slug(self):
-        return int(self.kwargs['vrf'])
 
 class VRFDetailView(RethinkAPIMixin, generics.RetrieveUpdateAPIView):
     pk_field = 'id'
     slug_field = 'vrf'
     serializer_class = VRFSerializer
-    group_filter_fields = []
     permission_classes = (permissions.IsAuthenticated, IsAdminForUpdate)
 
     def get_slug(self):
@@ -49,9 +45,6 @@ class IPBlockListView(RethinkAPIMixin, generics.ListCreateAPIView):
     serializer_class = IPBlockSerializer
     group_filter_fields = ['allocators']
     permission_classes = (permissions.IsAuthenticated, IsAdminForUpdate)
-
-    def get_slug(self):
-        return [int(self.kwargs['vrf']), self.kwargs['network'], int(self.kwargs['length'])]
 
 class IPBlockDetailView(RethinkAPIMixin, generics.RetrieveUpdateAPIView):
     pk_field = 'id'
@@ -77,9 +70,6 @@ class IPPrefixListView(RethinkAPIMixin, generics.ListCreateAPIView):
     group_filter_fields = ['managers']
     permission_classes = (permissions.IsAuthenticated,)
 
-    def get_slug(self):
-        return [int(self.kwargs['vrf']), self.kwargs['network'], int(self.kwargs['length'])]
-
 class IPPrefixDetailView(RethinkAPIMixin, generics.RetrieveUpdateAPIView):
     pk_field = 'id'
     slug_field = 'vrf_network_length'
@@ -95,23 +85,51 @@ class IsPrefixManagerPermission(permissions.BasePermission):
         if request.user.is_superuser:
             return True
         user_groups = set(request.user.groups.all().values_list('name', flat=True))
-        return len(user_groups.intersection(set(obj['managers']))) > 0
+        ip = netaddr.IPAddress(obj['ip']).value
+        prefix = r.table("ip_prefix").filter(lambda prefix:
+                    r.js("(" + str(ip) + " & ~(Math.pow(2, 32 - " +
+                        prefix['length'].coerce_to("string") + ") - 1)) == " +
+                        r.map(
+                            prefix['network'].split(".").map(lambda octet: octet.coerce_to("number")),
+                            [1 << 24, 1 << 16, 1 << 8, 1], lambda octet, multiplier: octet * multiplier).
+                        sum().coerce_to("string")
+                    )
+                ).order_by(r.desc("length")).nth(0).run(request.get_connection())
+        return len(user_groups.intersection(set(prefix['managers']))) > 0
 
 class IPAddressListView(RethinkAPIMixin, generics.ListCreateAPIView):
     pk_field = 'id'
     slug_field = 'vrf_ip'
     serializer_class = IPAddressSerializer
-    group_filter_fields = []
     permission_classes = (permissions.IsAuthenticated,)
 
-    def get_slug(self):
-        return [int(self.kwargs['vrf']), self.kwargs['address']]
+    def default_filter_queryset(self, queryset):
+        if self.request.user.is_superuser:
+            return queryset
+        queryset = queryset. \
+            merge(lambda address: {"prefix":
+                r.table("ip_prefix").filter(lambda prefix:
+                    r.js("(" +
+                        r.map(
+                            address['ip'].split(".").map(lambda octet: octet.coerce_to("number")),
+                            [1 << 24, 1 << 16, 1 << 8, 1], lambda octet, multiplier: octet * multiplier).
+                        sum().coerce_to("string") +
+                        " & ~(Math.pow(2, 32 - " +
+                        prefix['length'].coerce_to("string") + ") - 1)) == " +
+                        r.map(
+                            prefix['network'].split(".").map(lambda octet: octet.coerce_to("number")),
+                            [1 << 24, 1 << 16, 1 << 8, 1], lambda octet, multiplier: octet * multiplier).
+                        sum().coerce_to("string")
+                    )
+                ).order_by(r.desc("length")).nth(0)})
+        groups = self.request.user.groups.all().values_list('name', flat=True)
+        queryset = queryset.filter(lambda address: address['prefix']['managers'].set_intersection(groups).count() > 0)
+        return queryset
 
 class IPAddressDetailView(RethinkAPIMixin, generics.RetrieveUpdateAPIView):
     pk_field = 'id'
     slug_field = 'vrf_ip'
     serializer_class = IPAddressSerializer
-    group_filter_fields = []
     permission_classes = (permissions.IsAuthenticated, IsPrefixManagerPermission)
 
     def get_slug(self):
