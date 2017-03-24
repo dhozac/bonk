@@ -139,8 +139,8 @@ class DNSZoneSerializer(RethinkSerializer):
 
 class DNSRecordSerializer(RethinkSerializer):
     name = serializers.CharField(required=True)
-    zone = serializers.CharField(required=True) # FOREIGN KEY TO DNSZone.name
-    type = serializers.ChoiceField(choices=['A', 'AAAA', 'SRV', 'TXT'], required=True)
+    zone = serializers.CharField(required=True)
+    type = serializers.ChoiceField(choices=['A', 'AAAA', 'CNAME', 'MX', 'NS', 'PTR', 'SRV', 'TXT'], required=True)
     ttl = serializers.IntegerField(required=False)
     value = serializers.ListField(child=serializers.CharField())
 
