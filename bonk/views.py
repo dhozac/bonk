@@ -133,6 +133,44 @@ class IPPrefixDetailView(RethinkAPIMixin, generics.RetrieveUpdateAPIView):
     def get_slug(self):
         return [int(self.kwargs['vrf']), self.kwargs['network'], int(self.kwargs['length'])]
 
+class IPPrefixAllocateView(RethinkAPIMixin, generics.CreateAPIView):
+    slug_field = 'vrf_network_length'
+    serializer_class = IPPrefixSerializer
+    group_filter_fields = ['managers']
+    permission_classes = (permissions.IsAuthenticated, IsManagerPermission)
+
+    def get_slug(self):
+        return [int(self.kwargs['vrf']), self.kwargs['network'], int(self.kwargs['length'])]
+
+    def create(self, *args, **kwargs):
+        prefix = self.get_object()
+        if 'name' not in self.request.data:
+            raise serializers.ValidationError("name is required")
+        network = netaddr.IPNetwork("%s/%d" % (prefix['network'], prefix['length']))
+        used = netaddr.IPSet()
+        for address in IPAddressSerializer.filter_by_prefix(prefix):
+            used.add(netaddr.IPAddress(address['ip']))
+        available = netaddr.IPSet(network) ^ used
+        if 'ip' not in self.request.data:
+            for address in available:
+                if address not in (network.network, network.broadcast):
+                    break
+            else:
+                raise serializers.ValidationError("network is exhausted")
+        else:
+            address = netaddr.IPAddress(self.request.data['ip'])
+            if address not in available:
+                raise serializers.ValidationError("ip='%s' is already in use" % self.request.data['ip'])
+        obj = {
+            'state': self.request.data.get('state', 'allocated'),
+            'vrf': prefix['vrf'],
+            'ip': str(address),
+            'name': self.request.data['name'],
+        }
+        serializer = IPAddressSerializer(None, data=obj, context={'request': self.request})
+        serializer.is_valid(raise_exception=True)
+        return Response(serializer.save(), status=status.HTTP_201_CREATED)
+
 class IsPrefixManagerPermission(permissions.BasePermission):
     def has_object_permission(self, request, view, obj):
         if request.user.is_superuser:

@@ -112,6 +112,7 @@ class IPPrefixSerializer(RethinkSerializer):
 class IPAddressSerializer(RethinkSerializer):
     id = serializers.CharField(required=False, read_only=True)
     tags = serializers.DictField(required=False)
+    state = serializers.ChoiceField(required=True, choices=['allocated', 'reserved', 'quarantine'])
     vrf = serializers.IntegerField(required=True)
     ip = serializers.IPAddressField(required=True)
     name = serializers.CharField(required=True)
@@ -132,6 +133,22 @@ class IPAddressSerializer(RethinkSerializer):
         unique_together = [
             ('vrf', 'ip'),
         ]
+
+    @classmethod
+    def filter_by_prefix(cls, prefix, reql=False):
+        return cls.filter(lambda address:
+                r.js("(" +
+                    r.map(
+                        address['ip'].split(".").map(lambda octet: octet.coerce_to("number")),
+                        [1 << 24, 1 << 16, 1 << 8, 1], lambda octet, multiplier: octet * multiplier).
+                    sum().coerce_to("string") + " & ~(Math.pow(2, 32 - " +
+                    r.expr(prefix['length']).coerce_to("string") + ") - 1)) == " +
+                    r.map(
+                        r.expr(prefix['network']).split(".").map(lambda octet: octet.coerce_to("number")),
+                        [1 << 24, 1 << 16, 1 << 8, 1], lambda octet, multiplier: octet * multiplier).
+                    sum().coerce_to("string")
+                ),
+            reql=reql)
 
 class DNSZoneSerializer(RethinkSerializer):
     id = serializers.CharField(required=False, read_only=True)
