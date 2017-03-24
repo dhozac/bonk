@@ -76,7 +76,7 @@ class IPPrefixSerializer(RethinkSerializer):
     vrf = serializers.IntegerField(required=True)
     network = serializers.IPAddressField(required=True)
     length = serializers.IntegerField(required=True)
-    asn = serializers.IntegerField(required=True)
+    asn = serializers.IntegerField(required=False)
     state = serializers.ChoiceField(required=True, choices=['allocated', 'reserved', 'quarantine'])
     managers = serializers.ListField(child=serializers.CharField(validators=[validate_group_name]), required=False)
     dhcp = IPPrefixDHCPSerializer(required=False)
@@ -92,6 +92,22 @@ class IPPrefixSerializer(RethinkSerializer):
         unique_together = [
             ('vrf', 'network', 'length'),
         ]
+
+    @classmethod
+    def filter_by_block(cls, block, reql=False):
+        return cls.filter(lambda prefix:
+                r.js("(" +
+                    r.map(
+                        prefix['network'].split(".").map(lambda octet: octet.coerce_to("number")),
+                        [1 << 24, 1 << 16, 1 << 8, 1], lambda octet, multiplier: octet * multiplier).
+                    sum().coerce_to("string") + " & ~(Math.pow(2, 32 - " +
+                    r.expr(block['length']).coerce_to("string") + ") - 1)) == " +
+                    r.map(
+                        r.expr(block['network']).split(".").map(lambda octet: octet.coerce_to("number")),
+                        [1 << 24, 1 << 16, 1 << 8, 1], lambda octet, multiplier: octet * multiplier).
+                    sum().coerce_to("string")
+                ),
+            reql=reql)
 
 class IPAddressSerializer(RethinkSerializer):
     id = serializers.CharField(required=False, read_only=True)

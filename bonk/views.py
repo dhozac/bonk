@@ -56,6 +56,59 @@ class IPBlockDetailView(RethinkAPIMixin, generics.RetrieveUpdateAPIView):
     def get_slug(self):
         return [int(self.kwargs['vrf']), self.kwargs['network'], int(self.kwargs['length'])]
 
+class IPBlockAllocateView(RethinkAPIMixin, generics.CreateAPIView):
+    slug_field = 'vrf_network_length'
+    serializer_class = IPBlockSerializer
+    group_filter_fields = ['allocators']
+    permission_classes = (permissions.IsAuthenticated, IsAllocatorPermission)
+
+    def get_slug(self):
+        return [int(self.kwargs['vrf']), self.kwargs['network'], int(self.kwargs['length'])]
+
+    def create(self, *args, **kwargs):
+        block = self.get_object()
+        if 'hosts' in self.request.data and 'length' not in self.request.data:
+            if isinstance(self.request.data['hosts'], int):
+                s = bin(num_hosts + 2)[2:]
+                length = ((32 - len(s)) * "0" + s).find("1")
+            else:
+                raise serializers.ValidationError("hosts is invalid")
+        elif 'length' not in self.request.data:
+            raise serializers.ValidationError("prefix length is required")
+        elif (not isinstance(self.request.data['length'], int) or
+              self.request.data['length'] < block['length'] or
+              self.request.data['length'] > 30):
+            raise serializers.ValidationError("prefix length is invalid")
+        else:
+            length = self.request.data['length']
+        if 'managers' not in self.request.data:
+            raise serializers.ValidationError("managers is required")
+        pool = netaddr.IPSet([netaddr.IPNetwork("%s/%d" % (block['network'], block['length']))])
+        used = netaddr.IPSet()
+        for prefix in IPPrefixSerializer.filter_by_block(block):
+            used.add(netaddr.IPNetwork("%s/%d" % (prefix['network'], prefix['length'])))
+        available = pool ^ used
+        larger = None
+        for prefix in available.iter_cidrs():
+            if prefix.prefixlen == length:
+                break
+            elif prefix.prefixlen < length and (larger is None or larger.prefixlen > prefix.prefixlen):
+                larger = prefix
+        else:
+            if larger is None:
+                raise serializers.ValidationError("IP block is exhausted")
+            prefix = larger.subnet(length).next()
+        obj = {
+            'vrf': block['vrf'],
+            'network': str(prefix.network),
+            'length': prefix.prefixlen,
+            'state': self.request.data.get('state', 'allocated'),
+            'managers': self.request.data['managers'],
+        }
+        serializer = IPPrefixSerializer(None, data=obj, context={'request': self.request})
+        serializer.is_valid(raise_exception=True)
+        return Response(serializer.save(), status=status.HTTP_201_CREATED)
+
 class IsManagerPermission(permissions.BasePermission):
     def has_object_permission(self, request, view, obj):
         if request.user.is_superuser:
