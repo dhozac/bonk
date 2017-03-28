@@ -1,2 +1,3 @@
 netaddr
 djangorestframework
+django_rethink
