@@ -46,10 +46,17 @@ class VRFSerializer(RethinkSerializer):
             'vrf',
         ]
 
+def validate_vrf(value):
+    try:
+        VRFSerializer.get(vrf=value)
+    except:
+        raise serializers.ValidationError("vrf=%r doesn't exist" % value)
+    return value
+
 class IPBlockSerializer(RethinkSerializer):
     id = serializers.CharField(required=False, read_only=True)
     tags = serializers.DictField(required=False)
-    vrf = serializers.IntegerField(required=True)
+    vrf = serializers.IntegerField(required=True, validators=[validate_vrf])
     network = serializers.IPAddressField(required=True)
     length = serializers.IntegerField(required=True)
     announced_by = serializers.CharField(required=False)
@@ -87,7 +94,7 @@ class IPPrefixDDNSSerializer(DDNSSerializer):
 class IPPrefixSerializer(RethinkSerializer):
     id = serializers.CharField(required=False, read_only=True)
     tags = serializers.DictField(required=False)
-    vrf = serializers.IntegerField(required=True)
+    vrf = serializers.IntegerField(required=True, validators=[validate_vrf])
     network = serializers.IPAddressField(required=True)
     length = serializers.IntegerField(required=True)
     asn = serializers.IntegerField(required=False)
@@ -127,7 +134,7 @@ class IPAddressSerializer(RethinkSerializer):
     id = serializers.CharField(required=False, read_only=True)
     tags = serializers.DictField(required=False)
     state = serializers.ChoiceField(required=True, choices=['allocated', 'reserved', 'quarantine'])
-    vrf = serializers.IntegerField(required=True)
+    vrf = serializers.IntegerField(required=True, validators=[validate_vrf])
     ip = serializers.IPAddressField(required=True)
     name = serializers.CharField(required=True)
     dhcp_mac = serializers.CharField(required=False)
