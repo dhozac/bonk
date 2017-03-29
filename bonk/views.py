@@ -60,7 +60,7 @@ class IPBlockListView(RethinkAPIMixin, generics.ListCreateAPIView):
     group_filter_fields = ['allocators']
     permission_classes = (permissions.IsAuthenticated, IsAdminForUpdate)
 
-class IPBlockDetailView(RethinkAPIMixin, generics.RetrieveUpdateAPIView):
+class IPBlockDetailView(RethinkAPIMixin, generics.RetrieveUpdateDestroyAPIView):
     pk_field = 'id'
     slug_field = 'vrf_network_length'
     serializer_class = IPBlockSerializer
@@ -137,7 +137,7 @@ class IPPrefixListView(RethinkAPIMixin, generics.ListCreateAPIView):
     group_filter_fields = ['managers']
     permission_classes = (permissions.IsAuthenticated,)
 
-class IPPrefixDetailView(RethinkAPIMixin, generics.RetrieveUpdateAPIView):
+class IPPrefixDetailView(RethinkAPIMixin, generics.RetrieveUpdateDestroyAPIView):
     pk_field = 'id'
     slug_field = 'vrf_network_length'
     serializer_class = IPPrefixSerializer
@@ -231,7 +231,7 @@ class IPAddressListView(RethinkAPIMixin, generics.ListCreateAPIView):
         queryset = queryset.filter(lambda address: address['prefix']['managers'].set_intersection(groups).count() > 0)
         return queryset
 
-class IPAddressDetailView(RethinkAPIMixin, generics.RetrieveUpdateAPIView):
+class IPAddressDetailView(RethinkAPIMixin, generics.RetrieveUpdateDestroyAPIView):
     pk_field = 'id'
     slug_field = 'vrf_ip'
     serializer_class = IPAddressSerializer
