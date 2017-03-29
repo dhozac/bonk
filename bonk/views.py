@@ -135,7 +135,7 @@ class IPPrefixListView(RethinkAPIMixin, generics.ListCreateAPIView):
     slug_field = 'vrf_network_length'
     serializer_class = IPPrefixSerializer
     group_filter_fields = ['managers']
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (permissions.IsAuthenticated, IsAdminForUpdate)
 
 class IPPrefixDetailView(RethinkAPIMixin, generics.RetrieveUpdateDestroyAPIView):
     pk_field = 'id'
