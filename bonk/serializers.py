@@ -206,7 +206,6 @@ class IPAddressSerializer(RethinkSerializer):
         ]
         unique = [
             'name',
-            'dhcp_mac',
         ]
         unique_together = [
             ('vrf', 'ip'),
