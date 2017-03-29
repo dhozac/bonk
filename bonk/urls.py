@@ -15,6 +15,7 @@
 from django.conf.urls import include, url
 from bonk.views import *
 
+app_name = 'bonk'
 urlpatterns = [
     url(r'^vrf/?$', VRFListView.as_view(), name='vrf_list'),
     url(r'^vrf/(?P<vrf>[0-9]+)/?$', VRFListView.as_view(), name='vrf_detail'),
