@@ -53,7 +53,7 @@ class IPBlockSerializer(RethinkSerializer):
     network = serializers.IPAddressField(required=True)
     length = serializers.IntegerField(required=True)
     announced_by = serializers.CharField(required=False)
-    allocators = serializers.ListField(child=serializers.CharField(validators=[validate_group_name]), required=False)
+    allocators = serializers.ListField(child=serializers.CharField(validators=[validate_group_name]), required=False, allow_empty=True)
 
     class Meta(RethinkSerializer.Meta):
         table_name = 'ip_block'
@@ -92,7 +92,7 @@ class IPPrefixSerializer(RethinkSerializer):
     length = serializers.IntegerField(required=True)
     asn = serializers.IntegerField(required=False)
     state = serializers.ChoiceField(required=True, choices=['allocated', 'reserved', 'quarantine'])
-    managers = serializers.ListField(child=serializers.CharField(validators=[validate_group_name]), required=False)
+    managers = serializers.ListField(child=serializers.CharField(validators=[validate_group_name]), required=False, allow_empty=True)
     dhcp = IPPrefixDHCPSerializer(required=False)
     ddns = IPPrefixDDNSSerializer(required=False)
 
