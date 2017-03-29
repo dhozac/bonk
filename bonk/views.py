@@ -32,14 +32,10 @@ class IsAdminForUpdate(permissions.BasePermission):
             return True
 
 class VRFListView(RethinkAPIMixin, generics.ListCreateAPIView):
-    pk_field = 'id'
-    slug_field = 'vrf'
     serializer_class = VRFSerializer
     permission_classes = (permissions.IsAuthenticated, IsAdminForUpdate)
 
 class VRFDetailView(RethinkAPIMixin, generics.RetrieveUpdateAPIView):
-    pk_field = 'id'
-    slug_field = 'vrf'
     serializer_class = VRFSerializer
     permission_classes = (permissions.IsAuthenticated, IsAdminForUpdate)
 
@@ -54,15 +50,11 @@ class IsAllocatorPermission(permissions.BasePermission):
         return len(user_groups.intersection(set(obj['allocators']))) > 0
 
 class IPBlockListView(RethinkAPIMixin, generics.ListCreateAPIView):
-    pk_field = 'id'
-    slug_field = 'vrf_network_length'
     serializer_class = IPBlockSerializer
     group_filter_fields = ['allocators']
     permission_classes = (permissions.IsAuthenticated, IsAdminForUpdate)
 
 class IPBlockDetailView(RethinkAPIMixin, generics.RetrieveUpdateDestroyAPIView):
-    pk_field = 'id'
-    slug_field = 'vrf_network_length'
     serializer_class = IPBlockSerializer
     group_filter_fields = ['allocators']
     permission_classes = (permissions.IsAuthenticated, IsAllocatorPermission, IsAdminForUpdate)
@@ -71,7 +63,6 @@ class IPBlockDetailView(RethinkAPIMixin, generics.RetrieveUpdateDestroyAPIView):
         return [int(self.kwargs['vrf']), self.kwargs['network'], int(self.kwargs['length'])]
 
 class IPBlockAllocateView(RethinkAPIMixin, generics.CreateAPIView):
-    slug_field = 'vrf_network_length'
     serializer_class = IPBlockSerializer
     group_filter_fields = ['allocators']
     permission_classes = (permissions.IsAuthenticated, IsAllocatorPermission)
@@ -131,15 +122,11 @@ class IsManagerPermission(permissions.BasePermission):
         return len(user_groups.intersection(set(obj['managers']))) > 0
 
 class IPPrefixListView(RethinkAPIMixin, generics.ListCreateAPIView):
-    pk_field = 'id'
-    slug_field = 'vrf_network_length'
     serializer_class = IPPrefixSerializer
     group_filter_fields = ['managers']
     permission_classes = (permissions.IsAuthenticated, IsAdminForUpdate)
 
 class IPPrefixDetailView(RethinkAPIMixin, generics.RetrieveUpdateDestroyAPIView):
-    pk_field = 'id'
-    slug_field = 'vrf_network_length'
     serializer_class = IPPrefixSerializer
     group_filter_fields = ['managers']
     permission_classes = (permissions.IsAuthenticated, IsManagerPermission)
@@ -148,7 +135,6 @@ class IPPrefixDetailView(RethinkAPIMixin, generics.RetrieveUpdateDestroyAPIView)
         return [int(self.kwargs['vrf']), self.kwargs['network'], int(self.kwargs['length'])]
 
 class IPPrefixAllocateView(RethinkAPIMixin, generics.CreateAPIView):
-    slug_field = 'vrf_network_length'
     serializer_class = IPPrefixSerializer
     group_filter_fields = ['managers']
     permission_classes = (permissions.IsAuthenticated, IsManagerPermission)
@@ -194,8 +180,6 @@ class IsPrefixManagerPermission(permissions.BasePermission):
         return len(user_groups.intersection(set(prefix['managers']))) > 0
 
 class IPAddressListView(RethinkAPIMixin, generics.ListCreateAPIView):
-    pk_field = 'id'
-    slug_field = 'vrf_ip'
     serializer_class = IPAddressSerializer
     permission_classes = (permissions.IsAuthenticated,)
 
@@ -211,8 +195,6 @@ class IPAddressListView(RethinkAPIMixin, generics.ListCreateAPIView):
         return queryset
 
 class IPAddressDetailView(RethinkAPIMixin, generics.RetrieveUpdateDestroyAPIView):
-    pk_field = 'id'
-    slug_field = 'vrf_ip'
     serializer_class = IPAddressSerializer
     permission_classes = (permissions.IsAuthenticated, IsPrefixManagerPermission)
 
