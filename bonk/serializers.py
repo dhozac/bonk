@@ -16,7 +16,7 @@ from django.conf import settings
 from django.contrib.auth.models import Group
 from rest_framework import serializers
 import netaddr
-from django_rethink import r, BadRequestException, RethinkSerializer, RethinkObjectNotFound, RethinkMultipleObjectsFound, validate_unique_key
+from django_rethink import r, BadRequestException, RethinkSerializer, RethinkObjectNotFound, RethinkMultipleObjectsFound, validate_unique_key, get_connection
 
 def validate_group_name(group_name):
     try:
@@ -32,6 +32,19 @@ def validate_group_name(group_name):
             if len(result) > 0:
                 return True
         raise serializers.ValidationError("group %s does not exist" % group_name)
+
+def filter_in_subnet(ip, network):
+    return r.js("(" +
+            r.map(
+                r.expr(ip).split(".").map(lambda octet: octet.coerce_to("number")),
+                [1 << 24, 1 << 16, 1 << 8, 1], lambda octet, multiplier: octet * multiplier).
+            sum().coerce_to("string") + " & ~(Math.pow(2, 32 - " +
+            r.expr(network['length']).coerce_to("string") + ") - 1)) == " +
+            r.map(
+                r.expr(network['network']).split(".").map(lambda octet: octet.coerce_to("number")),
+                [1 << 24, 1 << 16, 1 << 8, 1], lambda octet, multiplier: octet * multiplier).
+            sum().coerce_to("string")
+        )
 
 class VRFSerializer(RethinkSerializer):
     id = serializers.CharField(required=False, read_only=True)
@@ -72,6 +85,27 @@ class IPBlockSerializer(RethinkSerializer):
         unique_together = [
             ('vrf', 'network', 'length'),
         ]
+
+    @classmethod
+    def get_by_ip(cls, vrf, ip, reql=False):
+        query = cls.filter(filter_in_subnet(ip, r.row), reql=True) \
+                .filter({'vrf': vrf}) \
+                .order_by(r.desc("length")).nth(0)
+        if reql:
+            return query
+        else:
+            try:
+                return query.run(get_connection())
+            except r.errors.ReqlNonExistenceError:
+                raise RethinkObjectNotFound("no block found for IP %s" % ip)
+
+    def validate(self, data):
+        data = super(IPBlockSerializer, self).validate(data)
+        full = self.get_updated_object(data)
+        network = netaddr.IPNetwork("%s/%d" % (full['network'], full['length']))
+        if str(network.network) != full['network']:
+            raise serializers.ValidationError("network is not the network address for %s/%d" % (full['network'], full['length']))
+        return data
 
 class IPPrefixDHCPSerializer(serializers.Serializer):
     enabled = serializers.BooleanField(required=True)
@@ -116,19 +150,42 @@ class IPPrefixSerializer(RethinkSerializer):
 
     @classmethod
     def filter_by_block(cls, block, reql=False):
-        return cls.filter(lambda prefix:
-                r.js("(" +
-                    r.map(
-                        prefix['network'].split(".").map(lambda octet: octet.coerce_to("number")),
-                        [1 << 24, 1 << 16, 1 << 8, 1], lambda octet, multiplier: octet * multiplier).
-                    sum().coerce_to("string") + " & ~(Math.pow(2, 32 - " +
-                    r.expr(block['length']).coerce_to("string") + ") - 1)) == " +
-                    r.map(
-                        r.expr(block['network']).split(".").map(lambda octet: octet.coerce_to("number")),
-                        [1 << 24, 1 << 16, 1 << 8, 1], lambda octet, multiplier: octet * multiplier).
-                    sum().coerce_to("string")
-                ),
-            reql=reql)
+        return cls.filter(filter_in_subnet(r.row['network'], block), reql=reql)
+
+    @classmethod
+    def get_by_ip(cls, vrf, ip, reql=False):
+        query = cls.filter(filter_in_subnet(ip, r.row), reql=True) \
+                .filter({'vrf': vrf}) \
+                .order_by(r.desc("length")).nth(0)
+        if reql:
+            return query
+        else:
+            try:
+                return query.run(get_connection())
+            except r.errors.ReqlNonExistenceError:
+                raise RethinkObjectNotFound("no prefix found for IP %s" % ip)
+
+    def validate(self, data):
+        data = super(IPPrefixSerializer, self).validate(data)
+        full = self.get_updated_object(data)
+        try:
+            block = IPBlockSerializer.get_by_ip(full['vrf'], full['network'])
+        except RethinkObjectNotFound:
+            raise serializers.ValidationError("no block exists matching prefix %s/%d" % (full['network'], full['length']))
+        if block['length'] > full['length']:
+            raise serializers.ValidationError("prefix %s/%d exceeds block of %s/%d" % (full['network'], full['length'], block['network'], block['length']))
+        underlappers = filter(lambda x: x[self.Meta.pk_field] != full.get(self.Meta.pk_field, None), self.filter_by_block(full))
+        if len(underlappers) > 0:
+            raise serializers.ValidationError("prefix %s/%d overlaps with %r" % (full['network'], full['length'], underlappers))
+        try:
+            overlapper = IPPrefixSerializer.get_by_ip(full['vrf'], full['network'])
+            raise serializers.ValidationError("prefix %s/%d includes this prefix %s/%d" % (overlapper['network'], overlapper['length'], full['network'], full['length']))
+        except RethinkObjectNotFound:
+            pass
+        network = netaddr.IPNetwork("%s/%d" % (full['network'], full['length']))
+        if str(network.network) != full['network']:
+            raise serializers.ValidationError("network is not the network address for %s/%d" % (full['network'], full['length']))
+        return data
 
 class IPAddressSerializer(RethinkSerializer):
     id = serializers.CharField(required=False, read_only=True)
@@ -157,19 +214,28 @@ class IPAddressSerializer(RethinkSerializer):
 
     @classmethod
     def filter_by_prefix(cls, prefix, reql=False):
-        return cls.filter(lambda address:
-                r.js("(" +
-                    r.map(
-                        address['ip'].split(".").map(lambda octet: octet.coerce_to("number")),
-                        [1 << 24, 1 << 16, 1 << 8, 1], lambda octet, multiplier: octet * multiplier).
-                    sum().coerce_to("string") + " & ~(Math.pow(2, 32 - " +
-                    r.expr(prefix['length']).coerce_to("string") + ") - 1)) == " +
-                    r.map(
-                        r.expr(prefix['network']).split(".").map(lambda octet: octet.coerce_to("number")),
-                        [1 << 24, 1 << 16, 1 << 8, 1], lambda octet, multiplier: octet * multiplier).
-                    sum().coerce_to("string")
-                ),
-            reql=reql)
+        return cls.filter(filter_in_subnet(r.row, prefix), reql=reql)
+
+    def validate_name(self, value):
+        possibles = []
+        for part in value.split(".")[:0:-1]:
+            possibles.append(part + "" if len(possibles) == 0 else "." + possibles[-1])
+        try:
+            zone = DNSZoneSerializer.filter(lambda zone: r.expr(possibles).contains(zone['name']), reql=True).order_by(r.desc(r.row['name'].count())).nth(0).run(self.conn)
+        except r.errors.ReqlNonExistenceError:
+            raise serializers.ValidationError("no zone matching %s could be found" % value)
+        user_groups = set(self.context['request'].user.groups.all().values_list('name', flat=True))
+        if len(user_groups.intersection(set(zone['managers']))) == 0:
+            raise serializers.ValidationError("you do not have permission to create names in %s" % zone['name'])
+
+    def validate(self, data):
+        data = super(IPAddressSerializer, self).validate(data)
+        full = self.get_updated_object(data)
+        try:
+            prefix = IPPrefixSerializer.get_by_ip(full['vrf'], full['ip'])
+        except RethinkObjectNotFound:
+            raise serializers.ValidationError("no prefix found for IP %s" % full['ip'])
+        return data
 
 class DNSZoneSerializer(RethinkSerializer):
     id = serializers.CharField(required=False, read_only=True)

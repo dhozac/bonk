@@ -190,16 +190,7 @@ class IsPrefixManagerPermission(permissions.BasePermission):
         if request.user.is_superuser:
             return True
         user_groups = set(request.user.groups.all().values_list('name', flat=True))
-        ip = netaddr.IPAddress(obj['ip']).value
-        prefix = r.table("ip_prefix").filter(lambda prefix:
-                    r.js("(" + str(ip) + " & ~(Math.pow(2, 32 - " +
-                        prefix['length'].coerce_to("string") + ") - 1)) == " +
-                        r.map(
-                            prefix['network'].split(".").map(lambda octet: octet.coerce_to("number")),
-                            [1 << 24, 1 << 16, 1 << 8, 1], lambda octet, multiplier: octet * multiplier).
-                        sum().coerce_to("string")
-                    )
-                ).order_by(r.desc("length")).nth(0).run(request.get_connection())
+        prefix = IPPrefixSerializer.get_by_ip(obj['vrf'], obj['ip'])
         return len(user_groups.intersection(set(prefix['managers']))) > 0
 
 class IPAddressListView(RethinkAPIMixin, generics.ListCreateAPIView):
@@ -213,20 +204,8 @@ class IPAddressListView(RethinkAPIMixin, generics.ListCreateAPIView):
             return queryset
         queryset = queryset. \
             merge(lambda address: {"prefix":
-                r.table("ip_prefix").filter(lambda prefix:
-                    r.js("(" +
-                        r.map(
-                            address['ip'].split(".").map(lambda octet: octet.coerce_to("number")),
-                            [1 << 24, 1 << 16, 1 << 8, 1], lambda octet, multiplier: octet * multiplier).
-                        sum().coerce_to("string") +
-                        " & ~(Math.pow(2, 32 - " +
-                        prefix['length'].coerce_to("string") + ") - 1)) == " +
-                        r.map(
-                            prefix['network'].split(".").map(lambda octet: octet.coerce_to("number")),
-                            [1 << 24, 1 << 16, 1 << 8, 1], lambda octet, multiplier: octet * multiplier).
-                        sum().coerce_to("string")
-                    )
-                ).order_by(r.desc("length")).nth(0)})
+                IPPrefixSerializer.get_by_ip(address['vrf'], address['ip'], reql=True)
+            })
         groups = self.request.user.groups.all().values_list('name', flat=True)
         queryset = queryset.filter(lambda address: address['prefix']['managers'].set_intersection(groups).count() > 0)
         return queryset
