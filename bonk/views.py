@@ -199,4 +199,44 @@ class IPAddressDetailView(RethinkAPIMixin, generics.RetrieveUpdateDestroyAPIView
     permission_classes = (permissions.IsAuthenticated, IsPrefixManagerPermission)
 
     def get_slug(self):
-        return [int(self.kwargs['vrf']), self.kwargs['address']]
+        return [int(self.kwargs['vrf']), self.kwargs['ip']]
+
+class DNSZoneListView(RethinkAPIMixin, generics.ListCreateAPIView):
+    serializer_class = DNSZoneSerializer
+    group_filter_fields = ['managers']
+    permission_classes = (permissions.IsAuthenticated, IsAdminForUpdate)
+
+class DNSZoneDetailView(RethinkAPIMixin, generics.RetrieveUpdateDestroyAPIView):
+    serializer_class = DNSZoneSerializer
+    group_filter_fields = ['managers']
+    permission_classes = (permissions.IsAuthenticated, IsManagerPermission)
+
+class IsZoneManagerPermission(permissions.BasePermission):
+    def has_object_permission(self, request, view, obj):
+        if request.user.is_superuser:
+            return True
+        user_groups = set(request.user.groups.all().values_list('name', flat=True))
+        zone = DNSZoneSerializer.get(name=obj['zone'])
+        return len(user_groups.intersection(set(zone['managers']))) > 0
+
+class DNSRecordListView(RethinkAPIMixin, generics.ListCreateAPIView):
+    serializer_class = DNSRecordSerializer
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def default_filter_queryset(self, queryset):
+        if self.request.user.is_superuser:
+            return queryset
+        queryset = queryset. \
+            merge(lambda record: {"zone_obj":
+                DNSZoneSerializer.filter(name=record['zone'], reql=True).nth(0)
+            })
+        groups = self.request.user.groups.all().values_list('name', flat=True)
+        queryset = queryset.filter(lambda record: record['zone_obj']['managers'].set_intersection(groups).count() > 0)
+        return queryset
+
+class DNSRecordDetailView(RethinkAPIMixin, generics.RetrieveUpdateDestroyAPIView):
+    serializer_class = DNSRecordSerializer
+    permission_classes = (permissions.IsAuthenticated, IsZoneManagerPermission)
+
+    def get_slug(self):
+        return [self.kwargs.get('name'), self.kwargs.get('type')]

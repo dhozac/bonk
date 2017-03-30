@@ -27,4 +27,8 @@ urlpatterns = [
     url(r'^prefix/(?P<vrf>[0-9]+)/(?P<network>[0-9a-f.:]+)/(?P<length>[0-9]+)/allocate/?$', IPPrefixAllocateView.as_view(), name='prefix_allocate'),
     url(r'^address/?$', IPAddressListView.as_view(), name='address_list'),
     url(r'^address/(?P<vrf>[0-9]+)/(?P<ip>[0-9a-f.:]+)/?$', IPAddressDetailView.as_view(), name='address_detail'),
+    url(r'^zone/?$', DNSZoneListView.as_view(), name='zone_list'),
+    url(r'^zone/(?P<slug>[A-Za-z0-9-.]+)/?$', DNSZoneDetailView.as_view(), name='zone_detail'),
+    url(r'^record/?$', DNSRecordListView.as_view(), name='record_list'),
+    url(r'^record/(?P<name>[A-Za-z0-9-.]+)/(?P<type>[A-Z]+)/?$', DNSRecordDetailView.as_view(), name='record_detail'),
 ]
