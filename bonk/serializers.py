@@ -257,6 +257,7 @@ class DNSZoneSerializer(RethinkSerializer):
         ]
 
 class DNSRecordSerializer(RethinkSerializer):
+    id = serializers.CharField(required=False, read_only=True)
     name = serializers.CharField(required=True)
     zone = serializers.CharField(required=True)
     type = serializers.ChoiceField(choices=['A', 'AAAA', 'CNAME', 'MX', 'NS', 'PTR', 'SRV', 'TXT'], required=True)
