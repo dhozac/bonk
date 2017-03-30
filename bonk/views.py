@@ -74,7 +74,7 @@ class IPBlockAllocateView(RethinkAPIMixin, generics.CreateAPIView):
         block = self.get_object()
         if 'hosts' in self.request.data and 'length' not in self.request.data:
             if isinstance(self.request.data['hosts'], int):
-                s = bin(num_hosts + 2)[2:]
+                s = bin(self.request.data['hosts'] + 2)[2:]
                 length = ((32 - len(s)) * "0" + s).find("1")
             else:
                 raise serializers.ValidationError("hosts is invalid")
