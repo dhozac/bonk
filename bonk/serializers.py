@@ -204,28 +204,34 @@ class IPAddressSerializer(RethinkSerializer):
             'name',
             ('vrf_ip', (r.row['vrf'], r.row['ip'])),
         ]
-        unique = [
-            'name',
-        ]
         unique_together = [
             ('vrf', 'ip'),
         ]
 
     @classmethod
     def filter_by_prefix(cls, prefix, reql=False):
-        return cls.filter(filter_in_subnet(r.row, prefix), reql=reql)
+        return cls.filter(filter_in_subnet(r.row['ip'], prefix), reql=reql)
 
     def validate_name(self, value):
         possibles = []
         for part in value.split(".")[:0:-1]:
-            possibles.append(part + "" if len(possibles) == 0 else "." + possibles[-1])
+            suffix = "" if len(possibles) == 0 else ("." + possibles[-1])
+            possibles.append(part + suffix)
         try:
             zone = DNSZoneSerializer.filter(lambda zone: r.expr(possibles).contains(zone['name']), reql=True).order_by(r.desc(r.row['name'].count())).nth(0).run(self.conn)
         except r.errors.ReqlNonExistenceError:
             raise serializers.ValidationError("no zone matching %s could be found" % value)
-        user_groups = set(self.context['request'].user.groups.all().values_list('name', flat=True))
-        if len(user_groups.intersection(set(zone['managers']))) == 0:
-            raise serializers.ValidationError("you do not have permission to create names in %s" % zone['name'])
+        if 'request' in self.context and not self.context['request'].user.is_superuser:
+            user_groups = set(self.context['request'].user.groups.all().values_list('name', flat=True))
+            if len(user_groups.intersection(set(zone['managers']))) == 0:
+                raise serializers.ValidationError("you do not have permission to create names in %s" % zone['name'])
+        try:
+            ip_address = IPAddressSerializer.get(name=value)
+            if self.instance is None or ip_address['id'] != self.instance['id']:
+                raise serializers.ValidationError("%r is already in use by %s" % (value, ip_address['ip']))
+        except RethinkObjectNotFound:
+            pass
+        return value
 
     def validate(self, data):
         data = super(IPAddressSerializer, self).validate(data)
@@ -266,22 +272,44 @@ class DNSRecordSerializer(RethinkSerializer):
 
     class Meta(RethinkSerializer.Meta):
         table_name = 'dns_record'
-        slug_field = 'name'
+        slug_field = 'name_type'
         indices = [
             'name',
             'zone',
+            ('name_type', (r.row['name'], r.row['type'])),
             ('value', {'multi': True}),
         ]
         unique_together = [
             ('name', 'type'),
         ]
 
-    def validate_zone(self, zone):
+    def validate_zone(self, value):
         try:
-            DNSZoneSerializer.get(name=zone)
+            zone = DNSZoneSerializer.get(name=value)
         except RethinkObjectNotFound:
-            raise serializers.ValidationError("'%s' does not exist" % zone)
-        return zone
+            raise serializers.ValidationError("'%s' does not exist" % value)
+        if 'request' in self.context and not self.context['request'].user.is_superuser:
+            user_groups = set(self.context['request'].user.groups.all().values_list('name', flat=True))
+            if len(user_groups.intersection(set(zone['managers']))) == 0:
+                raise serializers.ValidationError("you do not have permission to create names in %s" % zone['name'])
+        return value
 
     def validate(self, data):
+        data = super(DNSRecordSerializer, self).validate(data)
+        full = self.get_updated_object(data)
+        if full['name'] != full['zone'] and not full['name'].endswith('.' + full['zone']):
+            raise serializers.ValidationError("name %s is not in zone %s" % (full['name'], full['zone']))
+        # FIXME: Add validation of value for type
+        if full['type'] == 'CNAME':
+            records = list(DNSRecordSerializer.filter(name=full['name']))
+            if self.instance is not None:
+                records = filter(lambda x: x['id'] != self.instance['id'], records)
+            if len(records) > 0:
+                raise serializers.ValidationError("a CNAME record cannot be used on a name with any other record type")
+        else:
+            records = list(DNSRecordSerializer.filter(name=full['name'], type='CNAME'))
+            if self.instance is not None:
+                records = filter(lambda x: x['id'] != self.instance['id'], records)
+            if len(records) > 0:
+                raise serializers.ValidationError("a CNAME record exists for the specified name already")
         return data
