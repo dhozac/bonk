@@ -34,14 +34,14 @@ def validate_group_name(group_name):
         raise serializers.ValidationError("group %s does not exist" % group_name)
 
 def filter_in_subnet(ip, network):
-    return r.js("(" +
+    return lambda row: r.js("(" +
             r.map(
-                r.expr(ip).split(".").map(lambda octet: octet.coerce_to("number")),
+                r.expr(row[ip._args[1].data] if isinstance(ip, r.ast.Bracket) and str(ip).startswith("r.row") else ip).split(".").map(lambda octet: octet.coerce_to("number")),
                 [1 << 24, 1 << 16, 1 << 8, 1], lambda octet, multiplier: octet * multiplier).
             sum().coerce_to("string") + " & ~(Math.pow(2, 32 - " +
-            r.expr(network['length']).coerce_to("string") + ") - 1)) == " +
+            r.expr(row if str(network) == 'r.row' else network)['length'].coerce_to("string") + ") - 1)) == " +
             r.map(
-                r.expr(network['network']).split(".").map(lambda octet: octet.coerce_to("number")),
+                r.expr(row if str(network) == 'r.row' else network)['network'].split(".").map(lambda octet: octet.coerce_to("number")),
                 [1 << 24, 1 << 16, 1 << 8, 1], lambda octet, multiplier: octet * multiplier).
             sum().coerce_to("string")
         )
