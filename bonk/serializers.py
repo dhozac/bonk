@@ -16,7 +16,7 @@ from django.conf import settings
 from django.contrib.auth.models import Group
 from rest_framework import serializers
 import netaddr
-from django_rethink import r, BadRequestException, RethinkSerializer, RethinkObjectNotFound, RethinkMultipleObjectsFound, validate_unique_key, get_connection
+from django_rethink import r, RethinkSerializer, RethinkObjectNotFound, RethinkMultipleObjectsFound, validate_unique_key, get_connection
 
 def validate_group_name(group_name):
     try:
