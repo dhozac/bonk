@@ -40,7 +40,7 @@ class APITests(TestCase):
             pass
         r.db_create(settings.RETHINK_DB_DB).run(cls.conn)
         cls.conn.db = settings.RETHINK_DB_DB
-        management.call_command('createdb', verbosity=0)
+        management.call_command('syncrethinkdb', verbosity=0)
 
     @classmethod
     def tearDownClass(cls):
