@@ -462,6 +462,7 @@ class APITests(TestCase):
                     'vrf': ip1['vrf'],
                     'ip': ip1['ip'],
                 }), data=json.dumps({
+                    'version': ip1['version'],
                     'dhcp_mac': 'de:ad:be:ef:00:01',
                 }), content_type="application/json", HTTP_AUTHORIZATION=iter_auth)
             self.assertEqual(response.status_code, code)
@@ -565,6 +566,7 @@ class APITests(TestCase):
                 'name': record['name'],
                 'type': record['type'],
             }), data=json.dumps({
+                'version': record['version'],
                 'type': 'A',
                 'value': ['127.0.0.1'],
             }), content_type="application/json", HTTP_AUTHORIZATION=user1_auth)

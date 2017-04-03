@@ -16,7 +16,7 @@ from django.conf import settings
 from django.contrib.auth.models import Group
 from rest_framework import serializers
 import netaddr
-from django_rethink import r, RethinkSerializer, RethinkObjectNotFound, RethinkMultipleObjectsFound, validate_unique_key, get_connection
+from django_rethink import r, RethinkSerializer, RethinkObjectNotFound, RethinkMultipleObjectsFound, validate_unique_key, get_connection, HistorySerializerMixin
 
 def validate_group_name(group_name):
     try:
@@ -46,7 +46,7 @@ def filter_in_subnet(ip, network):
             sum().coerce_to("string")
         )
 
-class VRFSerializer(RethinkSerializer):
+class VRFSerializer(HistorySerializerMixin):
     id = serializers.CharField(required=False, read_only=True)
     tags = serializers.DictField(required=False)
     vrf = serializers.IntegerField(required=True)
@@ -66,7 +66,7 @@ def validate_vrf(value):
         raise serializers.ValidationError("vrf=%r doesn't exist" % value)
     return value
 
-class IPBlockSerializer(RethinkSerializer):
+class IPBlockSerializer(HistorySerializerMixin):
     id = serializers.CharField(required=False, read_only=True)
     tags = serializers.DictField(required=False)
     vrf = serializers.IntegerField(required=True, validators=[validate_vrf])
@@ -125,7 +125,7 @@ class DDNSSerializer(serializers.Serializer):
 class IPPrefixDDNSSerializer(DDNSSerializer):
     server = serializers.IPAddressField(required=True)
 
-class IPPrefixSerializer(RethinkSerializer):
+class IPPrefixSerializer(HistorySerializerMixin):
     id = serializers.CharField(required=False, read_only=True)
     tags = serializers.DictField(required=False)
     vrf = serializers.IntegerField(required=True, validators=[validate_vrf])
@@ -187,7 +187,7 @@ class IPPrefixSerializer(RethinkSerializer):
             raise serializers.ValidationError("network is not the network address for %s/%d" % (full['network'], full['length']))
         return data
 
-class IPAddressSerializer(RethinkSerializer):
+class IPAddressSerializer(HistorySerializerMixin):
     id = serializers.CharField(required=False, read_only=True)
     tags = serializers.DictField(required=False)
     state = serializers.ChoiceField(required=True, choices=['allocated', 'reserved', 'quarantine'])
@@ -242,7 +242,7 @@ class IPAddressSerializer(RethinkSerializer):
             raise serializers.ValidationError("no prefix found for IP %s" % full['ip'])
         return data
 
-class DNSZoneSerializer(RethinkSerializer):
+class DNSZoneSerializer(HistorySerializerMixin):
     id = serializers.CharField(required=False, read_only=True)
     tags = serializers.DictField(required=False)
     needs_review = serializers.BooleanField(required=False, default=False)
@@ -262,7 +262,7 @@ class DNSZoneSerializer(RethinkSerializer):
             'name',
         ]
 
-class DNSRecordSerializer(RethinkSerializer):
+class DNSRecordSerializer(HistorySerializerMixin):
     id = serializers.CharField(required=False, read_only=True)
     name = serializers.CharField(required=True)
     zone = serializers.CharField(required=True)
