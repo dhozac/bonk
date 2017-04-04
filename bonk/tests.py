@@ -330,6 +330,11 @@ class APITests(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn('non_field_errors', json.loads(response.content))
 
+    def test_ip_prefix_high_ip(self):
+        auth = self.create_common_objects()
+        ip_block = self.create_ip_block(auth, 0, '128.0.0.0', 24)
+        ip_prefix1 = self.allocate_ip_prefix(auth, 0, '128.0.0.0', 24, length=28, managers=[])
+
     def test_ip_address_allocate(self):
         auth = self.create_common_objects()
         user1_auth = self.create_user('user1', is_superuser=False, groups=['group1'])
