@@ -110,6 +110,8 @@ class IPBlockAllocateView(RethinkAPIMixin, generics.CreateAPIView):
             'state': self.request.data.get('state', 'allocated'),
             'managers': self.request.data['managers'],
         }
+        if 'reference' in self.request.data:
+            obj['reference'] = self.request.data['reference']
         serializer = IPPrefixSerializer(None, data=obj, context={'request': self.request})
         serializer.is_valid(raise_exception=True)
         return Response(serializer.save(), status=status.HTTP_201_CREATED)
@@ -167,6 +169,8 @@ class IPPrefixAllocateView(RethinkAPIMixin, generics.CreateAPIView):
             'ip': str(address),
             'name': self.request.data['name'],
         }
+        if 'reference' in self.request.data:
+            obj['reference'] = self.request.data['reference']
         serializer = IPAddressSerializer(None, data=obj, context={'request': self.request})
         serializer.is_valid(raise_exception=True)
         return Response(serializer.save(), status=status.HTTP_201_CREATED)

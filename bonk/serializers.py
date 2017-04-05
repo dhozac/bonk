@@ -137,6 +137,7 @@ class IPPrefixSerializer(HistorySerializerMixin):
     managers = serializers.ListField(child=serializers.CharField(validators=[validate_group_name]), required=False, allow_empty=True)
     dhcp = IPPrefixDHCPSerializer(required=False)
     ddns = IPPrefixDDNSSerializer(required=False)
+    reference = serializers.CharField(required=False)
 
     class Meta(RethinkSerializer.Meta):
         table_name = 'ip_prefix'
@@ -196,6 +197,7 @@ class IPAddressSerializer(HistorySerializerMixin):
     ip = serializers.IPAddressField(required=True)
     name = serializers.CharField(required=True)
     dhcp_mac = serializers.CharField(required=False)
+    reference = serializers.CharField(required=False)
 
     class Meta(RethinkSerializer.Meta):
         table_name = 'ip_address'
@@ -270,6 +272,7 @@ class DNSRecordSerializer(HistorySerializerMixin):
     type = serializers.ChoiceField(choices=['A', 'AAAA', 'CNAME', 'MX', 'NS', 'PTR', 'SRV', 'TXT'], required=True)
     ttl = serializers.IntegerField(required=False)
     value = serializers.ListField(child=serializers.CharField())
+    reference = serializers.CharField(required=False)
 
     class Meta(RethinkSerializer.Meta):
         table_name = 'dns_record'
