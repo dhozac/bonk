@@ -468,7 +468,7 @@ class APITests(TestCase):
                     'ip': ip1['ip'],
                 }), data=json.dumps({
                     'version': ip1['version'],
-                    'dhcp_mac': 'de:ad:be:ef:00:01',
+                    'dhcp_mac': ['de:ad:be:ef:00:01'],
                 }), content_type="application/json", HTTP_AUTHORIZATION=iter_auth)
             self.assertEqual(response.status_code, code)
 
