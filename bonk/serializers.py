@@ -250,14 +250,20 @@ class IPAddressSerializer(HistorySerializerMixin):
             raise serializers.ValidationError("no prefix found for IP %s" % full['ip'])
         return data
 
+class DNSZoneOptionsSerializer(serializers.Serializer):
+    ddns = DDNSSerializer(required=False)
+    forwarders = serializers.ListField(child=serializers.IPAddressField(), required=False)
+    notify = serializers.ListField(child=serializers.IPAddressField(), required=False)
+    masters = serializers.ListField(child=serializers.IPAddressField(), required=False)
+
 class DNSZoneSerializer(HistorySerializerMixin):
     id = serializers.CharField(required=False, read_only=True)
     tags = serializers.DictField(required=False)
     needs_review = serializers.BooleanField(required=False, default=False)
     managers = serializers.ListField(child=serializers.CharField(validators=[validate_group_name]), required=False)
     type = serializers.ChoiceField(required=True, choices=['internal', 'external'])
-    ddns = DDNSSerializer(required=False)
     name = serializers.CharField(required=True)
+    options = DNSZoneOptionsSerializer(required=False)
 
     class Meta(RethinkSerializer.Meta):
         table_name = 'dns_zone'
