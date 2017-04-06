@@ -16,6 +16,7 @@ from django.conf import settings
 from django.contrib.auth.models import Group
 from rest_framework import serializers
 import netaddr
+import re
 from django_rethink import r, RethinkSerializer, RethinkObjectNotFound, RethinkMultipleObjectsFound, validate_unique_key, get_connection, HistorySerializerMixin
 
 def validate_group_name(group_name):
@@ -189,6 +190,10 @@ class IPPrefixSerializer(HistorySerializerMixin):
             raise serializers.ValidationError("network is not the network address for %s/%d" % (full['network'], full['length']))
         return data
 
+validate_mac_re = re.compile(r'^(?:[0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$')
+def validate_mac(value):
+    return validate_mac_re.match(value) is not None
+
 class IPAddressSerializer(HistorySerializerMixin):
     id = serializers.CharField(required=False, read_only=True)
     tags = serializers.DictField(required=False)
@@ -196,7 +201,7 @@ class IPAddressSerializer(HistorySerializerMixin):
     vrf = serializers.IntegerField(required=True, validators=[validate_vrf])
     ip = serializers.IPAddressField(required=True)
     name = serializers.CharField(required=True)
-    dhcp_mac = serializers.CharField(required=False)
+    dhcp_mac = serializers.ListField(child=serializers.CharField(validators=[validate_mac]), required=False)
     reference = serializers.CharField(required=False)
 
     class Meta(RethinkSerializer.Meta):
