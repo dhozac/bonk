@@ -19,7 +19,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework import generics
 from rest_framework import permissions
-from django_rethink import RethinkAPIMixin
+from django_rethink import RethinkAPIMixin, RethinkSerializerPermission
 from bonk.serializers import *
 
 logger = logging.getLogger("bonk.views")
@@ -42,30 +42,23 @@ class VRFDetailView(RethinkAPIMixin, generics.RetrieveUpdateAPIView):
     def get_slug(self):
         return int(self.kwargs['vrf'])
 
-class IsAllocatorPermission(permissions.BasePermission):
-    def has_object_permission(self, request, view, obj):
-        if request.user.is_superuser:
-            return True
-        user_groups = set(request.user.groups.all().values_list('name', flat=True))
-        return len(user_groups.intersection(set(obj['allocators']))) > 0
-
 class IPBlockListView(RethinkAPIMixin, generics.ListCreateAPIView):
     serializer_class = IPBlockSerializer
-    group_filter_fields = ['allocators']
-    permission_classes = (permissions.IsAuthenticated, IsAdminForUpdate)
+    group_filter_fields = ['permissions_read', 'permissions_write', 'permissions_create']
+    permission_classes = (permissions.IsAuthenticated, RethinkSerializerPermission)
 
 class IPBlockDetailView(RethinkAPIMixin, generics.RetrieveUpdateDestroyAPIView):
     serializer_class = IPBlockSerializer
-    group_filter_fields = ['allocators']
-    permission_classes = (permissions.IsAuthenticated, IsAllocatorPermission, IsAdminForUpdate)
+    group_filter_fields = ['permissions_read', 'permissions_write', 'permissions_create']
+    permission_classes = (permissions.IsAuthenticated, RethinkSerializerPermission)
 
     def get_slug(self):
         return [int(self.kwargs['vrf']), self.kwargs['network'], int(self.kwargs['length'])]
 
 class IPBlockAllocateView(RethinkAPIMixin, generics.CreateAPIView):
     serializer_class = IPBlockSerializer
-    group_filter_fields = ['allocators']
-    permission_classes = (permissions.IsAuthenticated, IsAllocatorPermission)
+    group_filter_fields = ['permissions_create']
+    permission_classes = (permissions.IsAuthenticated, RethinkSerializerPermission)
 
     def get_slug(self):
         return [int(self.kwargs['vrf']), self.kwargs['network'], int(self.kwargs['length'])]
@@ -86,8 +79,8 @@ class IPBlockAllocateView(RethinkAPIMixin, generics.CreateAPIView):
             raise serializers.ValidationError("prefix length is invalid")
         else:
             length = self.request.data['length']
-        if 'managers' not in self.request.data:
-            raise serializers.ValidationError("managers is required")
+        if 'permissions' not in self.request.data:
+            raise serializers.ValidationError("permissions is required")
         pool = netaddr.IPSet([netaddr.IPNetwork("%s/%d" % (block['network'], block['length']))])
         used = netaddr.IPSet()
         for prefix in IPPrefixSerializer.filter_by_block(block):
@@ -108,7 +101,7 @@ class IPBlockAllocateView(RethinkAPIMixin, generics.CreateAPIView):
             'network': str(prefix.network),
             'length': prefix.prefixlen,
             'state': self.request.data.get('state', 'allocated'),
-            'managers': self.request.data['managers'],
+            'permissions': self.request.data['permissions'],
         }
         if 'reference' in self.request.data:
             obj['reference'] = self.request.data['reference']
@@ -116,30 +109,23 @@ class IPBlockAllocateView(RethinkAPIMixin, generics.CreateAPIView):
         serializer.is_valid(raise_exception=True)
         return Response(serializer.save(), status=status.HTTP_201_CREATED)
 
-class IsManagerPermission(permissions.BasePermission):
-    def has_object_permission(self, request, view, obj):
-        if request.user.is_superuser:
-            return True
-        user_groups = set(request.user.groups.all().values_list('name', flat=True))
-        return len(user_groups.intersection(set(obj['managers']))) > 0
-
 class IPPrefixListView(RethinkAPIMixin, generics.ListCreateAPIView):
     serializer_class = IPPrefixSerializer
-    group_filter_fields = ['managers']
-    permission_classes = (permissions.IsAuthenticated, IsAdminForUpdate)
+    group_filter_fields = ['permissions_read', 'permissions_create', 'permissions_write']
+    permission_classes = (permissions.IsAuthenticated, RethinkSerializerPermission)
 
 class IPPrefixDetailView(RethinkAPIMixin, generics.RetrieveUpdateDestroyAPIView):
     serializer_class = IPPrefixSerializer
-    group_filter_fields = ['managers']
-    permission_classes = (permissions.IsAuthenticated, IsManagerPermission)
+    group_filter_fields = ['permissions_read', 'permissions_create', 'permissions_write']
+    permission_classes = (permissions.IsAuthenticated, RethinkSerializerPermission)
 
     def get_slug(self):
         return [int(self.kwargs['vrf']), self.kwargs['network'], int(self.kwargs['length'])]
 
 class IPPrefixAllocateView(RethinkAPIMixin, generics.CreateAPIView):
     serializer_class = IPPrefixSerializer
-    group_filter_fields = ['managers']
-    permission_classes = (permissions.IsAuthenticated, IsManagerPermission)
+    group_filter_fields = ['permissions_create']
+    permission_classes = (permissions.IsAuthenticated, RethinkSerializerPermission)
 
     def get_slug(self):
         return [int(self.kwargs['vrf']), self.kwargs['network'], int(self.kwargs['length'])]
@@ -171,17 +157,20 @@ class IPPrefixAllocateView(RethinkAPIMixin, generics.CreateAPIView):
         }
         if 'reference' in self.request.data:
             obj['reference'] = self.request.data['reference']
+        if 'permissions' in self.request.data:
+            obj['permissions'] = self.request.data['permissions']
         serializer = IPAddressSerializer(None, data=obj, context={'request': self.request})
         serializer.is_valid(raise_exception=True)
         return Response(serializer.save(), status=status.HTTP_201_CREATED)
 
-class IsPrefixManagerPermission(permissions.BasePermission):
+class HasAddressPermission(RethinkSerializerPermission):
     def has_object_permission(self, request, view, obj):
-        if request.user.is_superuser:
+        if super(HasAddressPermission, self).has_object_permission(request, view, obj):
             return True
+        permission = self.get_permission(request, view, obj)
         user_groups = set(request.user.groups.all().values_list('name', flat=True))
         prefix = IPPrefixSerializer.get_by_ip(obj['vrf'], obj['ip'])
-        return len(user_groups.intersection(set(prefix['managers']))) > 0
+        return len(user_groups.intersection(self.get_groups(prefix, permission))) > 0
 
 class IPAddressListView(RethinkAPIMixin, generics.ListCreateAPIView):
     serializer_class = IPAddressSerializer
@@ -195,33 +184,32 @@ class IPAddressListView(RethinkAPIMixin, generics.ListCreateAPIView):
                 IPPrefixSerializer.get_by_ip(address['vrf'], address['ip'], reql=True)
             })
         groups = self.request.user.groups.all().values_list('name', flat=True)
-        queryset = queryset.filter(lambda address: address['prefix']['managers'].set_intersection(groups).count() > 0)
+        queryset = queryset.filter(lambda address:
+            address['prefix']['permissions']['read'].default([]).set_union(
+                address['prefix']['permissions']['write'].default([])
+            ).set_union(
+                address['permissions']['read'].default([])
+            ).set_union(
+                address['permissions']['write'].default([])
+            ).set_intersection(groups).count() > 0)
         return queryset
 
 class IPAddressDetailView(RethinkAPIMixin, generics.RetrieveUpdateDestroyAPIView):
     serializer_class = IPAddressSerializer
-    permission_classes = (permissions.IsAuthenticated, IsPrefixManagerPermission)
+    permission_classes = (permissions.IsAuthenticated, HasAddressPermission)
 
     def get_slug(self):
         return [int(self.kwargs['vrf']), self.kwargs['ip']]
 
 class DNSZoneListView(RethinkAPIMixin, generics.ListCreateAPIView):
     serializer_class = DNSZoneSerializer
-    group_filter_fields = ['managers']
-    permission_classes = (permissions.IsAuthenticated, IsAdminForUpdate)
+    group_filter_fields = ['permissions_read', 'permissions_create', 'permissions_write']
+    permission_classes = (permissions.IsAuthenticated,)
 
 class DNSZoneDetailView(RethinkAPIMixin, generics.RetrieveUpdateDestroyAPIView):
     serializer_class = DNSZoneSerializer
-    group_filter_fields = ['managers']
-    permission_classes = (permissions.IsAuthenticated, IsManagerPermission)
-
-class IsZoneManagerPermission(permissions.BasePermission):
-    def has_object_permission(self, request, view, obj):
-        if request.user.is_superuser:
-            return True
-        user_groups = set(request.user.groups.all().values_list('name', flat=True))
-        zone = DNSZoneSerializer.get(name=obj['zone'])
-        return len(user_groups.intersection(set(zone['managers']))) > 0
+    group_filter_fields = ['permissions_read', 'permissions_create', 'permissions_write']
+    permission_classes = (permissions.IsAuthenticated, RethinkSerializerPermission)
 
 class DNSRecordListView(RethinkAPIMixin, generics.ListCreateAPIView):
     serializer_class = DNSRecordSerializer
@@ -235,12 +223,28 @@ class DNSRecordListView(RethinkAPIMixin, generics.ListCreateAPIView):
                 DNSZoneSerializer.filter(name=record['zone'], reql=True).nth(0)
             })
         groups = self.request.user.groups.all().values_list('name', flat=True)
-        queryset = queryset.filter(lambda record: record['zone_obj']['managers'].set_intersection(groups).count() > 0)
+        queryset = queryset.filter(lambda record:
+            record['zone_obj']['permissions']['read'].default([]).set_union(
+                record['zone_obj']['permissions']['write'].default([])
+            ).set_union(
+                record['permissions']['read'].default([])
+            ).set_union(
+                record['permissions']['write'].default([])
+            ).set_intersection(groups).count() > 0)
         return queryset
+
+class HasRecordPermission(RethinkSerializerPermission):
+    def has_object_permission(self, request, view, obj):
+        if super(HasRecordPermission, self).has_object_permission(request, view, obj):
+            return True
+        permission = self.get_permission(request, view, obj)
+        user_groups = set(request.user.groups.all().values_list('name', flat=True))
+        zone = DNSZoneSerializer.get(name=obj['zone'])
+        return len(user_groups.intersection(self.get_groups(zone, permission))) > 0
 
 class DNSRecordDetailView(RethinkAPIMixin, generics.RetrieveUpdateDestroyAPIView):
     serializer_class = DNSRecordSerializer
-    permission_classes = (permissions.IsAuthenticated, IsZoneManagerPermission)
+    permission_classes = (permissions.IsAuthenticated, HasRecordPermission)
 
     def get_slug(self):
         return [self.kwargs.get('name'), self.kwargs.get('type')]

@@ -17,7 +17,7 @@ from django.contrib.auth.models import Group
 from rest_framework import serializers
 import netaddr
 import re
-from django_rethink import r, RethinkSerializer, RethinkObjectNotFound, RethinkMultipleObjectsFound, validate_unique_key, get_connection, HistorySerializerMixin
+from django_rethink import r, RethinkSerializer, RethinkObjectNotFound, RethinkMultipleObjectsFound, validate_unique_key, get_connection, HistorySerializerMixin, PermissionsSerializer
 
 def validate_group_name(group_name):
     try:
@@ -75,14 +75,16 @@ class IPBlockSerializer(HistorySerializerMixin):
     network = serializers.IPAddressField(required=True)
     length = serializers.IntegerField(required=True)
     announced_by = serializers.CharField(required=False)
-    allocators = serializers.ListField(child=serializers.CharField(validators=[validate_group_name]), required=False, allow_empty=True)
+    permissions = PermissionsSerializer(required=False)
 
     class Meta(RethinkSerializer.Meta):
         table_name = 'ip_block'
         slug_field = 'vrf_network_length'
         indices = [
             ('vrf_network_length', (r.row['vrf'], r.row['network'], r.row['length'])),
-            ('allocators', {'multi': True}),
+            ('permissions_read', r.row['permissions']['read'], {'multi': True}),
+            ('permissions_create', r.row['permissions']['create'], {'multi': True}),
+            ('permissions_write', r.row['permissions']['write'], {'multi': True}),
         ]
         unique_together = [
             ('vrf', 'network', 'length'),
@@ -135,7 +137,7 @@ class IPPrefixSerializer(HistorySerializerMixin):
     length = serializers.IntegerField(required=True)
     asn = serializers.IntegerField(required=False)
     state = serializers.ChoiceField(required=True, choices=['allocated', 'reserved', 'quarantine'])
-    managers = serializers.ListField(child=serializers.CharField(validators=[validate_group_name]), required=False, allow_empty=True)
+    permissions = PermissionsSerializer(required=False)
     dhcp = IPPrefixDHCPSerializer(required=False)
     ddns = IPPrefixDDNSSerializer(required=False)
     reference = serializers.CharField(required=False)
@@ -145,7 +147,9 @@ class IPPrefixSerializer(HistorySerializerMixin):
         slug_field = 'vrf_network_length'
         indices = [
             ('vrf_network_length', (r.row['vrf'], r.row['network'], r.row['length'])),
-            ('managers', {'multi': True}),
+            ('permissions_read', r.row['permissions']['read'], {'multi': True}),
+            ('permissions_create', r.row['permissions']['create'], {'multi': True}),
+            ('permissions_write', r.row['permissions']['write'], {'multi': True}),
         ]
         unique_together = [
             ('vrf', 'network', 'length'),
@@ -203,6 +207,7 @@ class IPAddressSerializer(HistorySerializerMixin):
     name = serializers.CharField(required=True)
     dhcp_mac = serializers.ListField(child=serializers.CharField(validators=[validate_mac]), required=False)
     reference = serializers.CharField(required=False)
+    permissions = PermissionsSerializer(required=False)
 
     class Meta(RethinkSerializer.Meta):
         table_name = 'ip_address'
@@ -211,6 +216,9 @@ class IPAddressSerializer(HistorySerializerMixin):
             'ip',
             'name',
             ('vrf_ip', (r.row['vrf'], r.row['ip'])),
+            ('permissions_read', r.row['permissions']['read'], {'multi': True}),
+            ('permissions_create', r.row['permissions']['create'], {'multi': True}),
+            ('permissions_write', r.row['permissions']['write'], {'multi': True}),
         ]
         unique_together = [
             ('vrf', 'ip'),
@@ -231,7 +239,10 @@ class IPAddressSerializer(HistorySerializerMixin):
             raise serializers.ValidationError("no zone matching %s could be found" % value)
         if 'request' in self.context and not self.context['request'].user.is_superuser:
             user_groups = set(self.context['request'].user.groups.all().values_list('name', flat=True))
-            if len(user_groups.intersection(set(zone['managers']))) == 0:
+            if len(user_groups.intersection(set(
+                    zone.get('permissions', {}).get('create', []) +
+                    zone.get('permissions', {}).get('write', [])
+                ))) == 0:
                 raise serializers.ValidationError("you do not have permission to create names in %s" % zone['name'])
         try:
             ip_address = IPAddressSerializer.get(name=value)
@@ -260,17 +271,19 @@ class DNSZoneSerializer(HistorySerializerMixin):
     id = serializers.CharField(required=False, read_only=True)
     tags = serializers.DictField(required=False)
     needs_review = serializers.BooleanField(required=False, default=False)
-    managers = serializers.ListField(child=serializers.CharField(validators=[validate_group_name]), required=False)
     type = serializers.ChoiceField(required=True, choices=['internal', 'external'])
     name = serializers.CharField(required=True)
     options = DNSZoneOptionsSerializer(required=False)
+    permissions = PermissionsSerializer(required=False)
 
     class Meta(RethinkSerializer.Meta):
         table_name = 'dns_zone'
         slug_field = 'name'
         indices = [
             'name',
-            ('managers', {'multi': True}),
+            ('permissions_read', r.row['permissions']['read'], {'multi': True}),
+            ('permissions_create', r.row['permissions']['create'], {'multi': True}),
+            ('permissions_write', r.row['permissions']['write'], {'multi': True}),
         ]
         unique = [
             'name',
@@ -284,6 +297,7 @@ class DNSRecordSerializer(HistorySerializerMixin):
     ttl = serializers.IntegerField(required=False)
     value = serializers.ListField(child=serializers.CharField())
     reference = serializers.CharField(required=False)
+    permissions = PermissionsSerializer(required=False)
 
     class Meta(RethinkSerializer.Meta):
         table_name = 'dns_record'
@@ -293,6 +307,9 @@ class DNSRecordSerializer(HistorySerializerMixin):
             'zone',
             ('name_type', (r.row['name'], r.row['type'])),
             ('value', {'multi': True}),
+            ('permissions_read', r.row['permissions']['read'], {'multi': True}),
+            ('permissions_create', r.row['permissions']['create'], {'multi': True}),
+            ('permissions_write', r.row['permissions']['write'], {'multi': True}),
         ]
         unique_together = [
             ('name', 'type'),
@@ -305,7 +322,10 @@ class DNSRecordSerializer(HistorySerializerMixin):
             raise serializers.ValidationError("'%s' does not exist" % value)
         if 'request' in self.context and not self.context['request'].user.is_superuser:
             user_groups = set(self.context['request'].user.groups.all().values_list('name', flat=True))
-            if len(user_groups.intersection(set(zone['managers']))) == 0:
+            if len(user_groups.intersection(set(
+                    zone.get('permissions', {}).get('create', []) +
+                    zone.get('permissions', {}).get('write', [])
+                ))) == 0:
                 raise serializers.ValidationError("you do not have permission to create names in %s" % zone['name'])
         return value
 
