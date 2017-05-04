@@ -138,6 +138,7 @@ class IPPrefixSerializer(HistorySerializerMixin):
     asn = serializers.IntegerField(required=False)
     state = serializers.ChoiceField(required=True, choices=['allocated', 'reserved', 'quarantine'])
     permissions = PermissionsSerializer(required=False)
+    gateway = serializers.IPAddressField(required=False)
     dhcp = IPPrefixDHCPSerializer(required=False)
     ddns = IPPrefixDDNSSerializer(required=False)
     reference = serializers.CharField(required=False)
@@ -267,12 +268,22 @@ class DNSZoneOptionsSerializer(serializers.Serializer):
     notify = serializers.ListField(child=serializers.IPAddressField(), required=False)
     masters = serializers.ListField(child=serializers.IPAddressField(), required=False)
 
+class DNSSOASerializer(serializers.Serializer):
+    authns = serializers.CharField(required=True)
+    email = serializers.CharField(required=True)
+    refresh = serializers.IntegerField(required=True)
+    retry = serializers.IntegerField(required=True)
+    expiry = serializers.IntegerField(required=True)
+    nxdomain = serializers.IntegerField(required=True)
+
 class DNSZoneSerializer(HistorySerializerMixin):
     id = serializers.CharField(required=False, read_only=True)
     tags = serializers.DictField(required=False)
     needs_review = serializers.BooleanField(required=False, default=False)
     type = serializers.ChoiceField(required=True, choices=['internal', 'external'])
     name = serializers.CharField(required=True)
+    soa = DNSSOASerializer(required=True)
+    ttl = serializers.IntegerField(required=False)
     options = DNSZoneOptionsSerializer(required=False)
     permissions = PermissionsSerializer(required=False)
 
