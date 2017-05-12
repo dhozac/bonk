@@ -277,13 +277,13 @@ class IPAddressSerializer(HistorySerializerMixin):
 
     def create(self, data):
         import bonk.tasks
-        data = super(IPPrefixSerializer, self).create(data)
+        data = super(IPAddressSerializer, self).create(data)
         bonk.tasks.trigger_dns_dhcp_rebuild.apply_async((data,))
         return data
 
     def update(self, instance, data):
         import bonk.tasks
-        data = super(IPPrefixSerializer, self).update(instance, data)
+        data = super(IPAddressSerializer, self).update(instance, data)
         bonk.tasks.trigger_dns_dhcp_rebuild.apply_async((data,))
         return data
 
@@ -327,13 +327,13 @@ class DNSZoneSerializer(HistorySerializerMixin):
 
     def create(self, data):
         import bonk.tasks
-        data = super(IPPrefixSerializer, self).create(data)
+        data = super(DNSZoneSerializer, self).create(data)
         bonk.tasks.trigger_dns_dhcp_rebuild.apply_async((data,))
         return data
 
     def update(self, instance, data):
         import bonk.tasks
-        data = super(IPPrefixSerializer, self).update(instance, data)
+        data = super(DNSZoneSerializer, self).update(instance, data)
         bonk.tasks.trigger_dns_dhcp_rebuild.apply_async((data,))
         return data
 
@@ -399,12 +399,12 @@ class DNSRecordSerializer(HistorySerializerMixin):
 
     def create(self, data):
         import bonk.tasks
-        data = super(IPPrefixSerializer, self).create(data)
+        data = super(DNSRecordSerializer, self).create(data)
         bonk.tasks.trigger_dns_dhcp_rebuild.apply_async((data,))
         return data
 
     def update(self, instance, data):
         import bonk.tasks
-        data = super(IPPrefixSerializer, self).update(instance, data)
+        data = super(DNSRecordSerializer, self).update(instance, data)
         bonk.tasks.trigger_dns_dhcp_rebuild.apply_async((data,))
         return data
