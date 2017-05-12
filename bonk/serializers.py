@@ -307,7 +307,7 @@ class DNSZoneSerializer(HistorySerializerMixin):
     needs_review = serializers.BooleanField(required=False, default=False)
     type = serializers.ChoiceField(required=True, choices=['internal', 'external'])
     name = serializers.CharField(required=True)
-    soa = DNSSOASerializer(required=True)
+    soa = DNSSOASerializer(required=False)
     ttl = serializers.IntegerField(required=False)
     options = DNSZoneOptionsSerializer(required=False)
     permissions = PermissionsSerializer(required=False)
