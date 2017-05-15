@@ -7,7 +7,7 @@ logger = logging.getLogger("bonk.tasks")
 
 @shared_task
 def trigger_dns_dhcp_rebuild(obj):
-    if hasattr(settings.BONK_TRIGGER_REBUILD):
+    if hasattr(settings, 'BONK_TRIGGER_REBUILD'):
         response = getattr(requests, settings.BONK_TRIGGER_REBUILD.get('method', 'get'))( 
             settings.BONK_TRIGGER_REBUILD['uri']
         )
