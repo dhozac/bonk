@@ -30,5 +30,5 @@ urlpatterns = [
     url(r'^zone/?$', DNSZoneListView.as_view(), name='zone_list'),
     url(r'^zone/(?P<slug>[A-Za-z0-9-.]+)/?$', DNSZoneDetailView.as_view(), name='zone_detail'),
     url(r'^record/?$', DNSRecordListView.as_view(), name='record_list'),
-    url(r'^record/(?P<name>[A-Za-z0-9-.]+)/(?P<type>[A-Z]+)/?$', DNSRecordDetailView.as_view(), name='record_detail'),
+    url(r'^record/(?P<name>[A-Za-z0-9-._]+)/(?P<type>[A-Z]+)/?$', DNSRecordDetailView.as_view(), name='record_detail'),
 ]
