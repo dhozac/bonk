@@ -122,11 +122,11 @@ class IPPrefixDHCPSerializer(serializers.Serializer):
         return value
 
 class DDNSSerializer(serializers.Serializer):
-    zone = serializers.CharField(required=True)
     algorithm = serializers.CharField(required=True)
     key = serializers.CharField(required=True)
 
 class IPPrefixDDNSSerializer(DDNSSerializer):
+    zone = serializers.CharField(required=True)
     server = serializers.IPAddressField(required=True)
 
 class IPPrefixSerializer(HistorySerializerMixin):
