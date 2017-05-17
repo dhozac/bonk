@@ -122,6 +122,7 @@ class IPPrefixDHCPSerializer(serializers.Serializer):
         return value
 
 class DDNSSerializer(serializers.Serializer):
+    name = serializers.CharField(required=True)
     algorithm = serializers.CharField(required=True)
     key = serializers.CharField(required=True)
 
