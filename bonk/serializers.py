@@ -209,6 +209,12 @@ class IPPrefixSerializer(HistorySerializerMixin):
         bonk.tasks.trigger_dns_dhcp_rebuild.apply_async((data,))
         return data
 
+    def delete(self):
+        import bonk.tasks
+        ret = super(IPPrefixSerializer, self).delete()
+        bonk.tasks.trigger_dns_dhcp_rebuild.apply_async((self.instance,))
+        return ret
+
 validate_mac_re = re.compile(r'^(?:[0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$')
 def validate_mac(value):
     return validate_mac_re.match(value) is not None
@@ -288,6 +294,12 @@ class IPAddressSerializer(HistorySerializerMixin):
         bonk.tasks.trigger_dns_dhcp_rebuild.apply_async((data,))
         return data
 
+    def delete(self):
+        import bonk.tasks
+        ret = super(IPAddressSerializer, self).delete()
+        bonk.tasks.trigger_dns_dhcp_rebuild.apply_async((self.instance,))
+        return ret
+
 class DNSZoneOptionsSerializer(serializers.Serializer):
     ddns = DDNSSerializer(required=False)
     forwarders = serializers.ListField(child=serializers.IPAddressField(), required=False)
@@ -337,6 +349,12 @@ class DNSZoneSerializer(HistorySerializerMixin):
         data = super(DNSZoneSerializer, self).update(instance, data)
         bonk.tasks.trigger_dns_dhcp_rebuild.apply_async((data,))
         return data
+
+    def delete(self):
+        import bonk.tasks
+        ret = super(DNSZoneSerializer, self).delete()
+        bonk.tasks.trigger_dns_dhcp_rebuild.apply_async((self.instance,))
+        return ret
 
 class DNSRecordSerializer(HistorySerializerMixin):
     id = serializers.CharField(required=False, read_only=True)
@@ -409,3 +427,9 @@ class DNSRecordSerializer(HistorySerializerMixin):
         data = super(DNSRecordSerializer, self).update(instance, data)
         bonk.tasks.trigger_dns_dhcp_rebuild.apply_async((data,))
         return data
+
+    def delete(self):
+        import bonk.tasks
+        ret = super(DNSRecordSerializer, self).delete()
+        bonk.tasks.trigger_dns_dhcp_rebuild.apply_async((self.instance,))
+        return ret
