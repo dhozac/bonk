@@ -75,7 +75,7 @@ class IPBlockAllocateView(RethinkAPIMixin, generics.CreateAPIView):
             raise serializers.ValidationError("prefix length is required")
         elif (not isinstance(self.request.data['length'], int) or
               self.request.data['length'] < block['length'] or
-              self.request.data['length'] > 30):
+              self.request.data['length'] > 31):
             raise serializers.ValidationError("prefix length is invalid")
         else:
             length = self.request.data['length']
@@ -138,11 +138,13 @@ class IPPrefixAllocateView(RethinkAPIMixin, generics.CreateAPIView):
         used = netaddr.IPSet()
         for address in IPAddressSerializer.filter_by_prefix(prefix):
             used.add(netaddr.IPAddress(address['ip']))
+        if prefix['length'] <= 30:
+            used.add(network.network)
+            used.add(network.broadcast)
         available = netaddr.IPSet(network) ^ used
         if 'ip' not in self.request.data:
             for address in available:
-                if address not in (network.network, network.broadcast):
-                    break
+                break
             else:
                 raise serializers.ValidationError("network is exhausted")
         else:
