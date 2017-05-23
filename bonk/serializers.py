@@ -217,12 +217,12 @@ class IPPrefixSerializer(HistorySerializerMixin):
 
 validate_mac_re = re.compile(r'^(?:[0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$')
 def validate_mac(value):
-    if validate_mac_re.match(value) is not None:
+    if validate_mac_re.match(value) is None:
         raise serializers.ValidationError("%s is not a valid MAC address (format as de:ad:be:ef:f0:00)" % value)
 
 validate_fqdn_re = re.compile(r'^(([a-zA-Z0-9_][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9])$')
 def validate_fqdn(value):
-    if validate_fqdn_re.match(value) is not None:
+    if validate_fqdn_re.match(value) is None:
         raise serializers.ValidationError("%s is not a valid FQDN" % value)
 
 class IPAddressSerializer(HistorySerializerMixin):
