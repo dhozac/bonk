@@ -188,7 +188,7 @@ class IPPrefixSerializer(HistorySerializerMixin):
             raise serializers.ValidationError("prefix %s/%d overlaps with %r" % (full['network'], full['length'], underlappers))
         try:
             overlapper = IPPrefixSerializer.get_by_ip(full['vrf'], full['network'])
-            if overlapper[self.Meta.pk_field] != full[self.Meta.pk_field]:
+            if overlapper[self.Meta.pk_field] != full.get(self.Meta.pk_field, None):
                 raise serializers.ValidationError("prefix %s/%d includes this prefix %s/%d" % (overlapper['network'], overlapper['length'], full['network'], full['length']))
         except RethinkObjectNotFound:
             pass
