@@ -219,13 +219,17 @@ validate_mac_re = re.compile(r'^(?:[0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$')
 def validate_mac(value):
     return validate_mac_re.match(value) is not None
 
+validate_fqdn_re = re.compile(r'^(([a-zA-Z0-9_][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9])$')
+def validate_fqdn(value):
+    return validate_fqdn_re.match(value) is not None
+
 class IPAddressSerializer(HistorySerializerMixin):
     id = serializers.CharField(required=False, read_only=True)
     tags = serializers.DictField(required=False)
     state = serializers.ChoiceField(required=True, choices=['allocated', 'reserved', 'quarantine'])
     vrf = serializers.IntegerField(required=True, validators=[validate_vrf])
     ip = serializers.IPAddressField(required=True)
-    name = serializers.CharField(required=True)
+    name = serializers.CharField(required=True, validators=[validate_fqdn])
     dhcp_mac = serializers.ListField(child=serializers.CharField(validators=[validate_mac]), required=False)
     reference = serializers.CharField(required=False)
     permissions = PermissionsSerializer(required=False)
@@ -319,7 +323,7 @@ class DNSZoneSerializer(HistorySerializerMixin):
     tags = serializers.DictField(required=False)
     needs_review = serializers.BooleanField(required=False, default=False)
     type = serializers.ChoiceField(required=True, choices=['internal', 'external'])
-    name = serializers.CharField(required=True)
+    name = serializers.CharField(required=True, validators=[validate_fqdn])
     soa = DNSSOASerializer(required=False)
     ttl = serializers.IntegerField(required=False)
     options = DNSZoneOptionsSerializer(required=False)
@@ -358,7 +362,7 @@ class DNSZoneSerializer(HistorySerializerMixin):
 
 class DNSRecordSerializer(HistorySerializerMixin):
     id = serializers.CharField(required=False, read_only=True)
-    name = serializers.CharField(required=True)
+    name = serializers.CharField(required=True, validators=[validate_fqdn])
     zone = serializers.CharField(required=True)
     type = serializers.ChoiceField(choices=['A', 'AAAA', 'CNAME', 'MX', 'NS', 'PTR', 'SRV', 'TXT'], required=True)
     ttl = serializers.IntegerField(required=False)
