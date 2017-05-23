@@ -180,19 +180,21 @@ class IPAddressListView(RethinkAPIMixin, generics.ListCreateAPIView):
     def default_filter_queryset(self, queryset):
         if self.request.user.is_superuser:
             return queryset
-        queryset = queryset. \
-            merge(lambda address: {"prefix":
-                IPPrefixSerializer.get_by_ip(address['vrf'], address['ip'], reql=True)
-            })
         groups = self.request.user.groups.all().values_list('name', flat=True)
-        queryset = queryset.filter(lambda address:
-            address['prefix']['permissions']['read'].default([]).set_union(
-                address['prefix']['permissions']['write'].default([])
-            ).set_union(
-                address['permissions']['read'].default([])
-            ).set_union(
-                address['permissions']['write'].default([])
-            ).set_intersection(groups).count() > 0)
+        prefixes = list(
+            reduce(lambda x, y: x.union(y),
+                [IPPrefixSerializer.filter(reql=True).get_all(*groups, index=i)
+                    for i in ['permissions_read', 'permissions_write']
+                ]
+            ).distinct().run(self.get_connection())
+        )
+        querysets = [IPAddressSerializer.filter_by_prefix(prefix, reql=True)
+            for prefix in prefixes
+        ] + [IPAddressSerializer.filter(reql=True).get_all(*groups, index=i)
+            for i in ['permissions_read', 'permissions_write']
+        ]
+        queryset = reduce(lambda x, y: x.union(y), querysets)
+        queryset = queryset.distinct()
         return queryset
 
 class IPAddressDetailView(RethinkAPIMixin, generics.RetrieveUpdateDestroyAPIView):
