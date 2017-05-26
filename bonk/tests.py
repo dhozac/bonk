@@ -102,11 +102,14 @@ class APITests(TestCase):
         self.assertEqual(response.status_code, 201)
         return json.loads(response.content)
 
-    def create_zone(self, auth, name, **fields):
-        response = self.client.post(reverse('bonk:zone_list'), data=json.dumps(dict(fields,
+    def _create_zone(self, auth, name, **fields):
+        return self.client.post(reverse('bonk:zone_list'), data=json.dumps(dict(fields,
             name=name,
             type=fields.get('type', 'internal'),
         )), content_type="application/json", HTTP_AUTHORIZATION=auth)
+
+    def create_zone(self, auth, name, **fields):
+        response = self._create_zone(auth, name, **fields)
         self.assertEqual(response.status_code, 201)
         return json.loads(response.content)
 
@@ -506,6 +509,21 @@ class APITests(TestCase):
         data = json.loads(response.content)
         self.assertEqual(len(data), 2)
         self.assertEqual(set(map(lambda x: x['id'], data)), set([zone2['id'], zone3['id']]))
+
+    def test_dns_zone_create_without_permission(self):
+        auth = self.create_common_objects()
+        user1_auth = self.create_user('user1', is_superuser=False, groups=['group1'])
+        response = self._create_zone(user1_auth, 'my1.zone', permissions={'write': ['group1']})
+        self.assertEqual(response.status_code, 400)
+        data = json.loads(response.content)
+        self.assertIn('non_field_errors', data)
+        self.assertIn('permission', data['non_field_errors'][0])
+
+    def test_dns_zone_create_with_permission(self):
+        auth = self.create_common_objects()
+        user1_auth = self.create_user('user1', is_superuser=False, groups=['group1'])
+        root_zone = self.create_zone(auth, 'zone', permissions={'create': ['group1']})
+        my_zone = self.create_zone(user1_auth, 'my1.zone', permissions={'write': ['group1']})
 
     def test_dns_records_list(self):
         auth = self.create_common_objects()

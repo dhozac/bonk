@@ -355,6 +355,27 @@ class DNSZoneSerializer(HistorySerializerMixin):
             'name',
         ]
 
+    def validate(self, data):
+        data = super(DNSZoneSerializer, self).validate(data)
+        if (self.instance is None and
+                self.context['request'].user is not None and
+                not self.context['request'].user.is_superuser
+            ):
+            zones = DNSZoneSerializer.filter(type=data['type'])
+            parent = {'name': '.'}
+            for zone in zones:
+                if data['name'].endswith("." + zone['name']):
+                    if len(zone['name']) > len(parent['name']):
+                        parent = zone
+            allowed = set(
+                parent.get('permissions', {}).get('write', []) +
+                parent.get('permissions', {}).get('create', [])
+            )
+            groups = set(self.context['request'].user.groups.all().values_list('name', flat=True))
+            if len(groups.intersection(allowed)) == 0:
+                raise serializers.ValidationError("you do not have permissions to zone %s" % (parent['name']))
+        return data
+
     def create(self, data):
         import bonk.tasks
         data = super(DNSZoneSerializer, self).create(data)
