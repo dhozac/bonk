@@ -335,6 +335,21 @@ class APITests(TestCase):
         ip_block = self.create_ip_block(auth, 0, '128.0.0.0', 24)
         ip_prefix1 = self.allocate_ip_prefix(auth, 0, '128.0.0.0', 24, length=28, permissions={})
 
+    def test_create_prefix_without_permission(self):
+        auth = self.create_common_objects()
+        ip_block = self.create_ip_block(auth, 0, '10.0.0.0', 16, permissions={})
+        user1_auth = self.create_user('user1', is_superuser=False, groups=['group1'])
+        response = self.client.post(reverse('bonk:prefix_list'), data=json.dumps({
+            'vrf': 0,
+            'network': '10.0.1.0',
+            'length': 24,
+            'state': 'allocated',
+        }), content_type="application/json", HTTP_AUTHORIZATION=user1_auth)
+        self.assertEqual(response.status_code, 400)
+        data = json.loads(response.content)
+        self.assertIn('non_field_errors', data)
+        self.assertIn('permission', data['non_field_errors'][0])
+
     def test_ip_address_allocate(self):
         auth = self.create_common_objects()
         user1_auth = self.create_user('user1', is_superuser=False, groups=['group1'])

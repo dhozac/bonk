@@ -183,6 +183,17 @@ class IPPrefixSerializer(HistorySerializerMixin):
             raise serializers.ValidationError("no block exists matching prefix %s/%d" % (full['network'], full['length']))
         if block['length'] > full['length']:
             raise serializers.ValidationError("prefix %s/%d exceeds block of %s/%d" % (full['network'], full['length'], block['network'], block['length']))
+        if (self.instance is None and
+                self.context['request'].user is not None and
+                not self.context['request'].user.is_superuser
+            ):
+            allowed = set(
+                block.get('permissions', {}).get('write', []) +
+                block.get('permissions', {}).get('create', [])
+            )
+            groups = set(self.context['request'].user.groups.all().values_list('name', flat=True))
+            if len(groups.intersection(allowed)) == 0:
+                raise serializers.ValidationError("you do not have permissions to block %s/%d" % (block['network'], block['length']))
         underlappers = filter(lambda x: x[self.Meta.pk_field] != full.get(self.Meta.pk_field, None), self.filter_by_block(full))
         if len(underlappers) > 0:
             raise serializers.ValidationError("prefix %s/%d overlaps with %r" % (full['network'], full['length'], underlappers))
