@@ -184,14 +184,14 @@ class IPAddressListView(RethinkAPIMixin, generics.ListCreateAPIView):
         prefixes = list(
             reduce(lambda x, y: x.union(y),
                 [IPPrefixSerializer.filter(reql=True).get_all(*groups, index=i)
-                    for i in ['permissions_read', 'permissions_write']
+                    for i in ['permissions_read', 'permissions_create', 'permissions_write']
                 ]
             ).distinct().run(self.get_connection())
         )
         querysets = [IPAddressSerializer.filter_by_prefix(prefix, reql=True)
             for prefix in prefixes
         ] + [IPAddressSerializer.filter(reql=True).get_all(*groups, index=i)
-            for i in ['permissions_read', 'permissions_write']
+            for i in ['permissions_read', 'permissions_create', 'permissions_write']
         ]
         queryset = reduce(lambda x, y: x.union(y), querysets)
         queryset = queryset.distinct()
