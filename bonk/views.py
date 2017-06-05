@@ -79,6 +79,8 @@ class IPBlockAllocateView(RethinkAPIMixin, generics.CreateAPIView):
             raise serializers.ValidationError("prefix length is invalid")
         else:
             length = self.request.data['length']
+        if 'name' not in self.request.data:
+            raise serializers.ValidationError("name is required")
         if 'permissions' not in self.request.data:
             raise serializers.ValidationError("permissions is required")
         pool = netaddr.IPSet([netaddr.IPNetwork("%s/%d" % (block['network'], block['length']))])
@@ -100,6 +102,7 @@ class IPBlockAllocateView(RethinkAPIMixin, generics.CreateAPIView):
             'vrf': block['vrf'],
             'network': str(prefix.network),
             'length': prefix.prefixlen,
+            'name': self.request.data['name'],
             'state': self.request.data.get('state', 'allocated'),
             'permissions': self.request.data['permissions'],
         }

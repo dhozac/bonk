@@ -137,6 +137,7 @@ class IPPrefixSerializer(HistorySerializerMixin):
     network = serializers.IPAddressField(required=True)
     length = serializers.IntegerField(required=True)
     asn = serializers.IntegerField(required=False)
+    name = serializers.CharField(required=False)
     state = serializers.ChoiceField(required=True, choices=['allocated', 'reserved', 'quarantine'])
     permissions = PermissionsSerializer(required=False)
     gateway = serializers.IPAddressField(required=False)
@@ -148,10 +149,14 @@ class IPPrefixSerializer(HistorySerializerMixin):
         table_name = 'ip_prefix'
         slug_field = 'vrf_network_length'
         indices = [
+            'name',
             ('vrf_network_length', (r.row['vrf'], r.row['network'], r.row['length'])),
             ('permissions_read', r.row['permissions']['read'], {'multi': True}),
             ('permissions_create', r.row['permissions']['create'], {'multi': True}),
             ('permissions_write', r.row['permissions']['write'], {'multi': True}),
+        ]
+        unique = [
+            'name'
         ]
         unique_together = [
             ('vrf', 'network', 'length'),
