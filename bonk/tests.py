@@ -28,6 +28,9 @@ from bonk.serializers import *
 
 @override_settings(
     RETHINK_DB_DB='bonkci',
+    CELERY_TASK_EAGER_PROPAGATES=True,
+    CELERY_TASK_ALWAYS_EAGER=True,
+    CELERY_BROKER_URL='memory://',
 )
 class APITests(TestCase):
     @classmethod
