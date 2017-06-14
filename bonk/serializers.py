@@ -48,6 +48,25 @@ def filter_in_subnet(ip, network):
             " & ~0)"
         )
 
+class BonkTriggerMixin(object):
+    def create(self, data):
+        import bonk.tasks
+        data = super(BonkTriggerMixin, self).create(data)
+        bonk.tasks.trigger_dns_dhcp_rebuild.apply_async((data,))
+        return data
+
+    def update(self, instance, data):
+        import bonk.tasks
+        data = super(BonkTriggerMixin, self).update(instance, data)
+        bonk.tasks.trigger_dns_dhcp_rebuild.apply_async((data,))
+        return data
+
+    def delete(self):
+        import bonk.tasks
+        ret = super(BonkTriggerMixin, self).delete()
+        bonk.tasks.trigger_dns_dhcp_rebuild.apply_async((self.instance,))
+        return ret
+
 class VRFSerializer(HistorySerializerMixin):
     id = serializers.CharField(required=False)
     tags = serializers.DictField(required=False)
@@ -130,7 +149,7 @@ class IPPrefixDDNSSerializer(DDNSSerializer):
     zone = serializers.CharField(required=True)
     server = serializers.IPAddressField(required=True)
 
-class IPPrefixSerializer(HistorySerializerMixin):
+class IPPrefixSerializer(BonkTriggerMixin, HistorySerializerMixin):
     id = serializers.CharField(required=False)
     tags = serializers.DictField(required=False)
     vrf = serializers.IntegerField(required=True, validators=[validate_vrf])
@@ -213,24 +232,6 @@ class IPPrefixSerializer(HistorySerializerMixin):
             raise serializers.ValidationError("network is not the network address for %s/%d" % (full['network'], full['length']))
         return data
 
-    def create(self, data):
-        import bonk.tasks
-        data = super(IPPrefixSerializer, self).create(data)
-        bonk.tasks.trigger_dns_dhcp_rebuild.apply_async((data,))
-        return data
-
-    def update(self, instance, data):
-        import bonk.tasks
-        data = super(IPPrefixSerializer, self).update(instance, data)
-        bonk.tasks.trigger_dns_dhcp_rebuild.apply_async((data,))
-        return data
-
-    def delete(self):
-        import bonk.tasks
-        ret = super(IPPrefixSerializer, self).delete()
-        bonk.tasks.trigger_dns_dhcp_rebuild.apply_async((self.instance,))
-        return ret
-
 validate_mac_re = re.compile(r'^(?:[0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$')
 def validate_mac(value):
     if validate_mac_re.match(value) is None:
@@ -241,7 +242,7 @@ def validate_fqdn(value):
     if validate_fqdn_re.match(value) is None:
         raise serializers.ValidationError("%s is not a valid FQDN" % value)
 
-class IPAddressSerializer(HistorySerializerMixin):
+class IPAddressSerializer(BonkTriggerMixin, HistorySerializerMixin):
     id = serializers.CharField(required=False)
     tags = serializers.DictField(required=False)
     state = serializers.ChoiceField(required=True, choices=['allocated', 'reserved', 'quarantine'])
@@ -304,24 +305,6 @@ class IPAddressSerializer(HistorySerializerMixin):
             raise serializers.ValidationError("no prefix found for IP %s" % full['ip'])
         return data
 
-    def create(self, data):
-        import bonk.tasks
-        data = super(IPAddressSerializer, self).create(data)
-        bonk.tasks.trigger_dns_dhcp_rebuild.apply_async((data,))
-        return data
-
-    def update(self, instance, data):
-        import bonk.tasks
-        data = super(IPAddressSerializer, self).update(instance, data)
-        bonk.tasks.trigger_dns_dhcp_rebuild.apply_async((data,))
-        return data
-
-    def delete(self):
-        import bonk.tasks
-        ret = super(IPAddressSerializer, self).delete()
-        bonk.tasks.trigger_dns_dhcp_rebuild.apply_async((self.instance,))
-        return ret
-
 class DNSZoneOptionsSerializer(serializers.Serializer):
     ddns = DDNSSerializer(required=False)
     forwarders = serializers.ListField(child=serializers.IPAddressField(), required=False)
@@ -336,7 +319,7 @@ class DNSSOASerializer(serializers.Serializer):
     expiry = serializers.IntegerField(required=True)
     nxdomain = serializers.IntegerField(required=True)
 
-class DNSZoneSerializer(HistorySerializerMixin):
+class DNSZoneSerializer(BonkTriggerMixin, HistorySerializerMixin):
     id = serializers.CharField(required=False)
     tags = serializers.DictField(required=False)
     needs_review = serializers.BooleanField(required=False, default=False)
@@ -381,25 +364,7 @@ class DNSZoneSerializer(HistorySerializerMixin):
                 raise serializers.ValidationError("you do not have permissions to zone %s" % (parent['name']))
         return data
 
-    def create(self, data):
-        import bonk.tasks
-        data = super(DNSZoneSerializer, self).create(data)
-        bonk.tasks.trigger_dns_dhcp_rebuild.apply_async((data,))
-        return data
-
-    def update(self, instance, data):
-        import bonk.tasks
-        data = super(DNSZoneSerializer, self).update(instance, data)
-        bonk.tasks.trigger_dns_dhcp_rebuild.apply_async((data,))
-        return data
-
-    def delete(self):
-        import bonk.tasks
-        ret = super(DNSZoneSerializer, self).delete()
-        bonk.tasks.trigger_dns_dhcp_rebuild.apply_async((self.instance,))
-        return ret
-
-class DNSRecordSerializer(HistorySerializerMixin):
+class DNSRecordSerializer(BonkTriggerMixin, HistorySerializerMixin):
     id = serializers.CharField(required=False)
     name = serializers.CharField(required=True, validators=[validate_fqdn])
     zone = serializers.CharField(required=True)
@@ -459,20 +424,4 @@ class DNSRecordSerializer(HistorySerializerMixin):
                 raise serializers.ValidationError("a CNAME record exists for the specified name already")
         return data
 
-    def create(self, data):
-        import bonk.tasks
-        data = super(DNSRecordSerializer, self).create(data)
-        bonk.tasks.trigger_dns_dhcp_rebuild.apply_async((data,))
-        return data
 
-    def update(self, instance, data):
-        import bonk.tasks
-        data = super(DNSRecordSerializer, self).update(instance, data)
-        bonk.tasks.trigger_dns_dhcp_rebuild.apply_async((data,))
-        return data
-
-    def delete(self):
-        import bonk.tasks
-        ret = super(DNSRecordSerializer, self).delete()
-        bonk.tasks.trigger_dns_dhcp_rebuild.apply_async((self.instance,))
-        return ret
