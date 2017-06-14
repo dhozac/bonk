@@ -424,4 +424,17 @@ class DNSRecordSerializer(BonkTriggerMixin, HistorySerializerMixin):
                 raise serializers.ValidationError("a CNAME record exists for the specified name already")
         return data
 
+class DHCPServerSetSerializer(BonkTriggerMixin, HistorySerializerMixin):
+    id = serializers.CharField(required=False)
+    name = serializers.CharField(required=True)
+    servers = serializers.ListField(child=serializers.IPAddressField())
 
+    class Meta(RethinkSerializer.Meta):
+        table_name = 'dhcp_server_set'
+        slug_field = 'name'
+        indices = [
+            'name',
+        ]
+        unique = [
+            'name',
+        ]

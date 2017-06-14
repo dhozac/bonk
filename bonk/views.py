@@ -255,3 +255,11 @@ class DNSRecordDetailView(RethinkAPIMixin, generics.RetrieveUpdateDestroyAPIView
 
     def get_slug(self):
         return [self.kwargs.get('name'), self.kwargs.get('type')]
+
+class DHCPServerSetListView(RethinkAPIMixin, generics.ListCreateAPIView):
+    serializer_class = DHCPServerSetSerializer
+    permission_classes = (permissions.IsAuthenticated, IsAdminForUpdate)
+
+class DHCPServerSetDetailView(RethinkAPIMixin, generics.RetrieveUpdateDestroyAPIView):
+    serializer_class = DHCPServerSetSerializer
+    permission_classes = (permissions.IsAuthenticated, IsAdminForUpdate)

@@ -48,7 +48,7 @@ class APITests(TestCase):
         super(APITests, cls).tearDownClass()
 
     def tearDown(self):
-        for t in ["vrf", "ip_prefix", "ip_block", "ip_address", "dns_zone", "dns_record"]:
+        for t in ["vrf", "ip_prefix", "ip_block", "ip_address", "dns_zone", "dns_record", "dhcp_server_set"]:
             r.table(t).delete().run(self.conn)
         super(APITests, self).tearDown()
 
@@ -608,4 +608,37 @@ class APITests(TestCase):
                 'type': 'A',
                 'value': ['127.0.0.1'],
             }), content_type="application/json", HTTP_AUTHORIZATION=user1_auth)
+        self.assertEqual(response.status_code, 200)
+
+    def test_dhcp_server_set_list(self):
+        auth = self.create_common_objects()
+        user1_auth = self.create_user('user1', is_superuser=False, groups=['group1'])
+
+        response = self.client.post(reverse('bonk:dhcp_server_set_list'), data=json.dumps({
+            'name': 'dhcp-set-1',
+            'servers': ['10.0.0.2', '10.0.0.3'],
+        }), content_type="application/json", HTTP_AUTHORIZATION=auth)
+        self.assertEqual(response.status_code, 201)
+
+        response = self.client.get(reverse('bonk:dhcp_server_set_list'), HTTP_AUTHORIZATION=user1_auth)
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.content)
+        self.assertEqual(len(data), 1)
+
+        response = self.client.get(reverse('bonk:dhcp_server_set_list'), HTTP_AUTHORIZATION=auth)
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.content)
+        self.assertEqual(len(data), 1)
+
+    def test_dhcp_server_set_detail(self):
+        auth = self.create_common_objects()
+        user1_auth = self.create_user('user1', is_superuser=False, groups=['group1'])
+
+        response = self.client.post(reverse('bonk:dhcp_server_set_list'), data=json.dumps({
+            'name': 'dhcp-set-1',
+            'servers': ['10.0.0.2', '10.0.0.3'],
+        }), content_type="application/json", HTTP_AUTHORIZATION=auth)
+        self.assertEqual(response.status_code, 201)
+
+        response = self.client.get(reverse('bonk:dhcp_server_set_detail', kwargs={'name': 'dhcp-set-1'}), HTTP_AUTHORIZATION=auth)
         self.assertEqual(response.status_code, 200)
