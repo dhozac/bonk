@@ -105,6 +105,7 @@ class IPBlockAllocateView(RethinkAPIMixin, generics.CreateAPIView):
             'name': self.request.data['name'],
             'state': self.request.data.get('state', 'allocated'),
             'permissions': self.request.data['permissions'],
+            'gateway': str(prefix.network + 1),
         }
         if 'reference' in self.request.data:
             obj['reference'] = self.request.data['reference']
