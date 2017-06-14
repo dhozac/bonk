@@ -49,7 +49,7 @@ def filter_in_subnet(ip, network):
         )
 
 class VRFSerializer(HistorySerializerMixin):
-    id = serializers.CharField(required=False, read_only=True)
+    id = serializers.CharField(required=False)
     tags = serializers.DictField(required=False)
     vrf = serializers.IntegerField(required=True)
     name = serializers.CharField(required=True)
@@ -69,7 +69,7 @@ def validate_vrf(value):
     return value
 
 class IPBlockSerializer(HistorySerializerMixin):
-    id = serializers.CharField(required=False, read_only=True)
+    id = serializers.CharField(required=False)
     tags = serializers.DictField(required=False)
     vrf = serializers.IntegerField(required=True, validators=[validate_vrf])
     network = serializers.IPAddressField(required=True)
@@ -131,7 +131,7 @@ class IPPrefixDDNSSerializer(DDNSSerializer):
     server = serializers.IPAddressField(required=True)
 
 class IPPrefixSerializer(HistorySerializerMixin):
-    id = serializers.CharField(required=False, read_only=True)
+    id = serializers.CharField(required=False)
     tags = serializers.DictField(required=False)
     vrf = serializers.IntegerField(required=True, validators=[validate_vrf])
     network = serializers.IPAddressField(required=True)
@@ -242,7 +242,7 @@ def validate_fqdn(value):
         raise serializers.ValidationError("%s is not a valid FQDN" % value)
 
 class IPAddressSerializer(HistorySerializerMixin):
-    id = serializers.CharField(required=False, read_only=True)
+    id = serializers.CharField(required=False)
     tags = serializers.DictField(required=False)
     state = serializers.ChoiceField(required=True, choices=['allocated', 'reserved', 'quarantine'])
     vrf = serializers.IntegerField(required=True, validators=[validate_vrf])
@@ -337,7 +337,7 @@ class DNSSOASerializer(serializers.Serializer):
     nxdomain = serializers.IntegerField(required=True)
 
 class DNSZoneSerializer(HistorySerializerMixin):
-    id = serializers.CharField(required=False, read_only=True)
+    id = serializers.CharField(required=False)
     tags = serializers.DictField(required=False)
     needs_review = serializers.BooleanField(required=False, default=False)
     type = serializers.ChoiceField(required=True, choices=['internal', 'external'])
@@ -400,7 +400,7 @@ class DNSZoneSerializer(HistorySerializerMixin):
         return ret
 
 class DNSRecordSerializer(HistorySerializerMixin):
-    id = serializers.CharField(required=False, read_only=True)
+    id = serializers.CharField(required=False)
     name = serializers.CharField(required=True, validators=[validate_fqdn])
     zone = serializers.CharField(required=True)
     type = serializers.ChoiceField(choices=['A', 'AAAA', 'CNAME', 'MX', 'NS', 'PTR', 'SRV', 'TXT'], required=True)
