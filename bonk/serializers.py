@@ -132,12 +132,20 @@ class IPBlockSerializer(HistorySerializerMixin):
 
 class IPPrefixDHCPSerializer(serializers.Serializer):
     enabled = serializers.BooleanField(required=True)
+    server_set = serializers.CharField(required=False)
     range = serializers.ListField(child=serializers.IPAddressField(), required=False)
     options = serializers.ListField(child=serializers.CharField(), required=False)
 
     def validate_range(self, value):
         if value and len(value) != 2:
             raise serializers.ValidationError("range must have a start and end address")
+        return value
+
+    def validate_server_set(self, value):
+        try:
+            DHCPServerSetSerializer.get(name=value)
+        except RethinkObjectNotFound:
+            raise serializers.ValidationError("server_set=%r doesn't exist" % value)
         return value
 
 class DDNSSerializer(serializers.Serializer):
