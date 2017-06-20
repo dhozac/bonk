@@ -53,7 +53,7 @@ def trigger_prefix_create(prefix, block):
         switch_domains = set()
         for firewall in firewalls:
             for nic in firewall.get('nics', []):
-                if 'remote' in nic and 'domain' in nic:
+                if 'remote' in nic and 'domain' in nic['remote']:
                     switch_domains.add(nic['remote']['domain'])
         data = dict(urlparse.parse_qsl(url.query))
         domains = dict(
