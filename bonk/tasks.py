@@ -66,7 +66,7 @@ def trigger_prefix_create(prefix, block):
                 'vrf': prefix['vrf'],
                 'network': prefix['network'],
                 'length': prefix['length'],
-                'permissions': prefix['permissions'],
+                'permissions': prefix.get('permissions', {}),
                 'domains': domains,
             }
         )
