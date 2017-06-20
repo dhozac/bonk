@@ -240,6 +240,22 @@ class IPPrefixSerializer(BonkTriggerMixin, HistorySerializerMixin):
             raise serializers.ValidationError("network is not the network address for %s/%d" % (full['network'], full['length']))
         return data
 
+    def create(self, data):
+        import bonk.tasks
+        data = super(IPPrefixSerializer, self).create(data)
+        block = IPBlockSerializer.get_by_ip(data['vrf'], data['network'])
+        if 'announced_by' in block:
+            bonk.tasks.trigger_prefix_create.apply_async((data, block))
+        return data
+
+    def delete(self):
+        import bonk.tasks
+        block = IPBlockSerializer.get_by_ip(self.instance['vrf'], self.instance['network'])
+        if 'announced_by' in block:
+            bonk.tasks.trigger_prefix_delete.apply_async((self.instance, block))
+        ret = super(IPPrefixSerializer, self).delete()
+        return ret
+
 validate_mac_re = re.compile(r'^(?:[0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$')
 def validate_mac(value):
     if validate_mac_re.match(value) is None:
