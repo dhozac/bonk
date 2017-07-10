@@ -85,6 +85,8 @@ class IPBlockAllocateView(RethinkAPIMixin, generics.CreateAPIView):
             raise serializers.ValidationError("permissions is required")
         pool = netaddr.IPSet([netaddr.IPNetwork("%s/%d" % (block['network'], block['length']))])
         used = netaddr.IPSet()
+        for subblock in IPBlockSerializer.filter_by_block(block):
+            used.add(netaddr.IPNetwork("%s/%d" % (subblock['network'], subblock['length'])))
         for prefix in IPPrefixSerializer.filter_by_block(block):
             used.add(netaddr.IPNetwork("%s/%d" % (prefix['network'], prefix['length'])))
         available = pool ^ used

@@ -122,6 +122,10 @@ class IPBlockSerializer(HistorySerializerMixin):
             except r.errors.ReqlNonExistenceError:
                 raise RethinkObjectNotFound("no block found for IP %s" % ip)
 
+    @classmethod
+    def filter_by_block(cls, block, reql=False):
+        return cls.filter(filter_in_subnet(r.row['network'], block), reql=reql)
+
     def validate(self, data):
         data = super(IPBlockSerializer, self).validate(data)
         full = self.get_updated_object(data)
