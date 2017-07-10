@@ -55,10 +55,17 @@ def trigger_prefix_create(prefix, block):
             for nic in firewall.get('nics', []):
                 if 'remote' in nic and 'domain' in nic['remote']:
                     switch_domains.add(nic['remote']['domain'])
+        if prefix.get('name', False):
+            name = prefix['name']
+        elif prefix.get('tags', False):
+            if prefix['tags'].get('name', False):
+                name = prefix['tags']['name']
+        else:
+            raise Exception("unable to find key Name or Tags.Name")
         data = dict(urlparse.parse_qsl(url.query))
         domains = dict(
-            [(domain, {'name': prefix['name'], 'vlan_id': 0, 'data': data})] +
-            [(switch_domain, {'name': prefix['name'], 'vlan_id': 0})
+            [(domain, {'name': name, 'vlan_id': 0, 'data': data})] +
+            [(switch_domain, {'name': name, 'vlan_id': 0})
                 for switch_domain in switch_domains]
         )
         response = socrates_request("post", "https://%s/network/" % url.netloc,
