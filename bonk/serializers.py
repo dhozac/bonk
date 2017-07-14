@@ -409,13 +409,14 @@ class DNSRecordSerializer(BonkTriggerMixin, HistorySerializerMixin):
             'name',
             'zone',
             ('name_type', (r.row['name'], r.row['type'])),
+            ('zone_name_type', (r.row['zone'], r.row['name'], r.row['type'])),
             ('value', {'multi': True}),
             ('permissions_read', r.row['permissions']['read'], {'multi': True}),
             ('permissions_create', r.row['permissions']['create'], {'multi': True}),
             ('permissions_write', r.row['permissions']['write'], {'multi': True}),
         ]
         unique_together = [
-            ('name', 'type'),
+            ('zone', 'name', 'type'),
         ]
 
     def validate_zone(self, value):
