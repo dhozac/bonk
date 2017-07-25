@@ -80,6 +80,8 @@ addresses for their devices.
   * The network length for this prefix.
 - asn
   * The ASN this prefix belongs to.
+- name
+  * The name of this prefix. Must be unique.
 - state
   * The state of this prefix. Must be one of allocated, reserved, or
     quarantine.
@@ -104,6 +106,9 @@ addresses for their devices.
   - enabled
     * Boolean designating whether DHCP is enabled on this network or
       not.
+  - server_set
+    * String referring to the DHCP server set where this prefix
+      should be configured.
   - range
     * A list of exactly two addresses, the first being the start of
       the DHCP range, and the second being the end.
@@ -112,6 +117,8 @@ addresses for their devices.
 - ddns
   - zone
     * Name of the zone to register DDNS in.
+  - name
+    * Name of the DDNS key.
   - algorithm
     * Algorithm to use for signing DDNS requests.
   - key
@@ -184,6 +191,8 @@ permissions on the zone.
   * Default time-to-live for this zone in seconds.
 - options
   - ddns
+    - name
+      * Name of the key to use for verifying DDNS requests.
     - algorithm
       * Algorithm to use for verifiying DDNS requests.
     - key
