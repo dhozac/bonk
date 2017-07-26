@@ -115,8 +115,9 @@ class IPBlockAllocateView(RethinkAPIMixin, generics.CreateAPIView):
             'permissions': self.request.data['permissions'],
             'gateway': str(prefix.network + 1),
         }
-        if 'reference' in self.request.data:
-            obj['reference'] = self.request.data['reference']
+        for field in ['reference', 'dhcp', 'ddns', 'asn', 'tags']:
+            if field in self.request.data:
+                obj[field] = self.request.data[field]
         serializer = IPPrefixSerializer(None, data=obj, context={'request': self.request})
         serializer.is_valid(raise_exception=True)
         return Response(serializer.save(), status=status.HTTP_201_CREATED)
