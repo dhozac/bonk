@@ -445,6 +445,8 @@ class DNSRecordSerializer(BonkTriggerMixin, HistorySerializerMixin):
                 records = filter(lambda x: x['id'] != self.instance['id'], records)
             if len(records) > 0:
                 raise serializers.ValidationError("a CNAME record cannot be used on a name with any other record type")
+            if len(full['value']) > 1:
+                raise serializers.ValidationError("a CNAME record can only have one value")
         else:
             records = list(DNSRecordSerializer.filter(name=full['name'], type='CNAME'))
             if self.instance is not None:
