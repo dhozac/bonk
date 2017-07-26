@@ -161,6 +161,7 @@ curl -u $USER -XPATCH -H 'Content-Type: application/json' --data @- \
     "create": ["group2"]
   }
 }
+EOF
 ```
 
 ### Delete a prefix
