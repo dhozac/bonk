@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import logging
+import uuid
 import netaddr
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -20,6 +21,7 @@ from rest_framework import status
 from rest_framework import generics
 from rest_framework import permissions
 from django_rethink import RethinkAPIMixin, RethinkSerializerPermission
+from django_rethink.tasks import rethinkdb_lock, rethinkdb_unlock
 from bonk.serializers import *
 
 logger = logging.getLogger("bonk.views")
@@ -83,44 +85,51 @@ class IPBlockAllocateView(RethinkAPIMixin, generics.CreateAPIView):
             raise serializers.ValidationError("name is required")
         if 'permissions' not in self.request.data:
             raise serializers.ValidationError("permissions is required")
-        pool = netaddr.IPSet([netaddr.IPNetwork("%s/%d" % (block['network'], block['length']))])
-        used = netaddr.IPSet()
-        for subblock in IPBlockSerializer.filter_by_block(block):
-            if (subblock['vrf'] == block['vrf'] and
-                    subblock['network'] == block['network'] and
-                    subblock['length'] == block['length']):
-                continue
-            if subblock['length'] < block['length']:
-                continue
-            used.add(netaddr.IPNetwork("%s/%d" % (subblock['network'], subblock['length'])))
-        for prefix in IPPrefixSerializer.filter_by_block(block):
-            used.add(netaddr.IPNetwork("%s/%d" % (prefix['network'], prefix['length'])))
-        available = pool - used
-        larger = None
-        for prefix in available.iter_cidrs():
-            if prefix.prefixlen == length:
-                break
-            elif prefix.prefixlen < length and (larger is None or larger.prefixlen > prefix.prefixlen):
-                larger = prefix
-        else:
-            if larger is None:
-                raise serializers.ValidationError("IP block is exhausted")
-            prefix = larger.subnet(length).next()
-        obj = {
-            'vrf': block['vrf'],
-            'network': str(prefix.network),
-            'length': prefix.prefixlen,
-            'name': self.request.data['name'],
-            'state': self.request.data.get('state', 'allocated'),
-            'permissions': self.request.data['permissions'],
-            'gateway': str(prefix.network + 1),
-        }
-        for field in ['reference', 'dhcp', 'ddns', 'asn', 'tags']:
-            if field in self.request.data:
-                obj[field] = self.request.data[field]
-        serializer = IPPrefixSerializer(None, data=obj, context={'request': self.request})
-        serializer.is_valid(raise_exception=True)
-        return Response(serializer.save(), status=status.HTTP_201_CREATED)
+        lock_token = str(uuid.uuid4())
+        lock_name = "block-allocate-%s-%d" % (block['network'], block['length'])
+        result = rethinkdb_lock.apply_async(tuple(), {'name': lock_name, 'token': lock_token})
+        result.get()
+        try:
+            pool = netaddr.IPSet([netaddr.IPNetwork("%s/%d" % (block['network'], block['length']))])
+            used = netaddr.IPSet()
+            for subblock in IPBlockSerializer.filter_by_block(block):
+                if (subblock['vrf'] == block['vrf'] and
+                        subblock['network'] == block['network'] and
+                        subblock['length'] == block['length']):
+                    continue
+                if subblock['length'] < block['length']:
+                    continue
+                used.add(netaddr.IPNetwork("%s/%d" % (subblock['network'], subblock['length'])))
+            for prefix in IPPrefixSerializer.filter_by_block(block):
+                used.add(netaddr.IPNetwork("%s/%d" % (prefix['network'], prefix['length'])))
+            available = pool - used
+            larger = None
+            for prefix in available.iter_cidrs():
+                if prefix.prefixlen == length:
+                    break
+                elif prefix.prefixlen < length and (larger is None or larger.prefixlen > prefix.prefixlen):
+                    larger = prefix
+            else:
+                if larger is None:
+                    raise serializers.ValidationError("IP block is exhausted")
+                prefix = larger.subnet(length).next()
+            obj = {
+                'vrf': block['vrf'],
+                'network': str(prefix.network),
+                'length': prefix.prefixlen,
+                'name': self.request.data['name'],
+                'state': self.request.data.get('state', 'allocated'),
+                'permissions': self.request.data['permissions'],
+                'gateway': str(prefix.network + 1),
+            }
+            for field in ['reference', 'dhcp', 'ddns', 'asn', 'tags']:
+                if field in self.request.data:
+                    obj[field] = self.request.data[field]
+            serializer = IPPrefixSerializer(None, data=obj, context={'request': self.request})
+            serializer.is_valid(raise_exception=True)
+            return Response(serializer.save(), status=status.HTTP_201_CREATED)
+        finally:
+            rethinkdb_unlock.apply_async(tuple(), {'name': lock_name, 'token': lock_token})
 
 class IPPrefixListView(RethinkAPIMixin, generics.ListCreateAPIView):
     serializer_class = IPPrefixSerializer
@@ -147,35 +156,42 @@ class IPPrefixAllocateView(RethinkAPIMixin, generics.CreateAPIView):
         prefix = self.get_object()
         if 'name' not in self.request.data:
             raise serializers.ValidationError("name is required")
-        network = netaddr.IPNetwork("%s/%d" % (prefix['network'], prefix['length']))
-        used = netaddr.IPSet()
-        for address in IPAddressSerializer.filter_by_prefix(prefix):
-            used.add(netaddr.IPAddress(address['ip']))
-        if prefix['length'] <= 30:
-            used.add(network.network)
-            used.add(network.broadcast)
-        available = netaddr.IPSet(network) ^ used
-        if 'ip' not in self.request.data:
-            for address in available:
-                break
+        lock_token = str(uuid.uuid4())
+        lock_name = "prefix-allocate-%s-%d" % (prefix['network'], prefix['length'])
+        result = rethinkdb_lock.apply_async(tuple(), {'name': lock_name, 'token': lock_token})
+        result.get()
+        try:
+            network = netaddr.IPNetwork("%s/%d" % (prefix['network'], prefix['length']))
+            used = netaddr.IPSet()
+            for address in IPAddressSerializer.filter_by_prefix(prefix):
+                used.add(netaddr.IPAddress(address['ip']))
+            if prefix['length'] <= 30:
+                used.add(network.network)
+                used.add(network.broadcast)
+            available = netaddr.IPSet(network) ^ used
+            if 'ip' not in self.request.data:
+                for address in available:
+                    break
+                else:
+                    raise serializers.ValidationError("network is exhausted")
             else:
-                raise serializers.ValidationError("network is exhausted")
-        else:
-            address = netaddr.IPAddress(self.request.data['ip'])
-            if address not in available:
-                raise serializers.ValidationError("ip='%s' is already in use" % self.request.data['ip'])
-        obj = {
-            'state': self.request.data.get('state', 'allocated'),
-            'vrf': prefix['vrf'],
-            'ip': str(address),
-            'name': self.request.data['name'],
-        }
-        for field in ['reference', 'permissions', 'dhcp_mac']:
-            if field in self.request.data:
-                obj[field] = self.request.data[field]
-        serializer = IPAddressSerializer(None, data=obj, context={'request': self.request})
-        serializer.is_valid(raise_exception=True)
-        return Response(serializer.save(), status=status.HTTP_201_CREATED)
+                address = netaddr.IPAddress(self.request.data['ip'])
+                if address not in available:
+                    raise serializers.ValidationError("ip='%s' is already in use" % self.request.data['ip'])
+            obj = {
+                'state': self.request.data.get('state', 'allocated'),
+                'vrf': prefix['vrf'],
+                'ip': str(address),
+                'name': self.request.data['name'],
+            }
+            for field in ['reference', 'permissions', 'dhcp_mac']:
+                if field in self.request.data:
+                    obj[field] = self.request.data[field]
+            serializer = IPAddressSerializer(None, data=obj, context={'request': self.request})
+            serializer.is_valid(raise_exception=True)
+            return Response(serializer.save(), status=status.HTTP_201_CREATED)
+        finally:
+            rethinkdb_unlock.apply_async(tuple(), {'name': lock_name, 'token': lock_token})
 
 class HasAddressPermission(RethinkSerializerPermission):
     def has_object_permission(self, request, view, obj):
