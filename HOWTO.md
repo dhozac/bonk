@@ -3,6 +3,9 @@
 This document contains a number of more-or-less common use-cases and
 how to achieve them with bonk.
 
+For a reference of the data model, look at
+[the data model](DATAMODEL.md).
+
 ## IPAM
 
 ### Create a new block
