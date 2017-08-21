@@ -622,6 +622,33 @@ class APITests(TestCase):
             }), content_type="application/json", HTTP_AUTHORIZATION=user1_auth)
         self.assertEqual(response.status_code, 200)
 
+    def test_dns_records_reviews(self):
+        auth = self.create_common_objects()
+        user1_auth = self.create_user('user1', is_superuser=False, groups=['group1'])
+        user2_auth = self.create_user('user2', is_superuser=False, groups=['group2'])
+        zone1 = self.create_zone(auth, 'my1.zone', permissions={'write': ['group1'], 'create': ['group2']}, needs_review=True)
+
+        response = self._create_record(user2_auth, 'www.my1.zone', 'my1.zone', 'A', ['127.0.0.1'], permissions={'write': ['group2']})
+        self.assertEqual(response.status_code, 400)
+        data = json.loads(response.content)
+        self.assertEqual(data[0], 'review created')
+
+        response = self.client.patch(reverse('django_rethink:review_detail', kwargs={'id': data[1]}), data=json.dumps({
+            'approvals': ['user1'],
+        }), content_type="application/json", HTTP_AUTHORIZATION=user1_auth)
+        self.assertEqual(response.status_code, 200)
+
+        response = self.client.patch(reverse('django_rethink:review_detail', kwargs={'id': data[1]}), data=json.dumps({
+            'state': 'executed',
+        }), content_type="application/json", HTTP_AUTHORIZATION=user1_auth)
+        self.assertEqual(response.status_code, 200)
+
+        response = self.client.get(reverse('bonk:record_list'), HTTP_AUTHORIZATION=user2_auth)
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.content)
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data[0]['name'], 'www.my1.zone')
+
     def test_dhcp_server_set_list(self):
         auth = self.create_common_objects()
         user1_auth = self.create_user('user1', is_superuser=False, groups=['group1'])

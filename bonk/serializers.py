@@ -17,7 +17,7 @@ from django.contrib.auth.models import Group
 from rest_framework import serializers
 import netaddr
 import re
-from django_rethink import r, RethinkSerializer, RethinkObjectNotFound, RethinkMultipleObjectsFound, validate_unique_key, get_connection, HistorySerializerMixin, PermissionsSerializer
+from django_rethink import r, RethinkSerializer, RethinkObjectNotFound, RethinkMultipleObjectsFound, validate_unique_key, get_connection, HistorySerializerMixin, NeedsReviewMixin, PermissionsSerializer
 
 def validate_group_name(group_name):
     try:
@@ -347,7 +347,7 @@ class DNSSOASerializer(serializers.Serializer):
     expiry = serializers.IntegerField(required=True)
     nxdomain = serializers.IntegerField(required=True)
 
-class DNSZoneSerializer(BonkTriggerMixin, HistorySerializerMixin):
+class DNSZoneSerializer(NeedsReviewMixin, BonkTriggerMixin, HistorySerializerMixin):
     id = serializers.CharField(required=False)
     tags = serializers.DictField(required=False)
     needs_review = serializers.BooleanField(required=False, default=False)
@@ -361,6 +361,7 @@ class DNSZoneSerializer(BonkTriggerMixin, HistorySerializerMixin):
     class Meta(RethinkSerializer.Meta):
         table_name = 'dns_zone'
         slug_field = 'name'
+        needs_review_field = 'needs_review'
         indices = [
             'name',
             ('permissions_read', r.row['permissions']['read'], {'multi': True}),
@@ -392,7 +393,7 @@ class DNSZoneSerializer(BonkTriggerMixin, HistorySerializerMixin):
                 raise serializers.ValidationError("you do not have permissions to zone %s" % (parent['name']))
         return data
 
-class DNSRecordSerializer(BonkTriggerMixin, HistorySerializerMixin):
+class DNSRecordSerializer(NeedsReviewMixin, BonkTriggerMixin, HistorySerializerMixin):
     id = serializers.CharField(required=False)
     name = serializers.CharField(required=True, validators=[validate_fqdn])
     zone = serializers.CharField(required=True)
@@ -419,18 +420,26 @@ class DNSRecordSerializer(BonkTriggerMixin, HistorySerializerMixin):
             ('zone', 'name', 'type'),
         ]
 
+    def needs_review(self, instance, data):
+        if not hasattr(self, 'zone'):
+            self._zone = DNSZoneSerializer(DNSZoneSerializer.get(name=data.get('zone', instance['zone'] if instance else None)))
+        return self._zone.needs_review(self._zone.instance, {})
+
+    def get_reviewers(self, instance, data):
+        return self._zone.get_reviewers(self._zone.instance, {})
+
     def validate_zone(self, value):
         try:
-            zone = DNSZoneSerializer.get(name=value)
+            self._zone = DNSZoneSerializer(DNSZoneSerializer.get(name=value))
         except RethinkObjectNotFound:
             raise serializers.ValidationError("'%s' does not exist" % value)
         if 'request' in self.context and not self.context['request'].user.is_superuser:
             user_groups = set(self.context['request'].user.groups.all().values_list('name', flat=True))
             if len(user_groups.intersection(set(
-                    zone.get('permissions', {}).get('create', []) +
-                    zone.get('permissions', {}).get('write', [])
+                    self._zone.instance.get('permissions', {}).get('create', []) +
+                    self._zone.instance.get('permissions', {}).get('write', [])
                 ))) == 0:
-                raise serializers.ValidationError("you do not have permission to create names in %s" % zone['name'])
+                raise serializers.ValidationError("you do not have permission to create names in %s" % value)
         return value
 
     def validate(self, data):
