@@ -34,20 +34,6 @@ def validate_group_name(group_name):
                 return True
         raise serializers.ValidationError("group %s does not exist" % group_name)
 
-def filter_in_subnet(ip, network):
-    return lambda row: r.js("(" +
-            r.map(
-                r.expr(row[ip._args[1].data] if isinstance(ip, r.ast.Bracket) and str(ip).startswith("r.row") else ip).split(".").map(lambda octet: octet.coerce_to("number")),
-                [1 << 24, 1 << 16, 1 << 8, 1], lambda octet, multiplier: octet * multiplier).
-            sum().coerce_to("string") + " & ~(Math.pow(2, 32 - " +
-            r.expr(row if str(network) == 'r.row' else network)['length'].coerce_to("string") + ") - 1)) == (" +
-            r.map(
-                r.expr(row if str(network) == 'r.row' else network)['network'].split(".").map(lambda octet: octet.coerce_to("number")),
-                [1 << 24, 1 << 16, 1 << 8, 1], lambda octet, multiplier: octet * multiplier).
-            sum().coerce_to("string") +
-            " & ~0)"
-        )
-
 class BonkTriggerMixin(object):
     def create(self, data):
         import bonk.tasks
@@ -111,7 +97,11 @@ class IPBlockSerializer(HistorySerializerMixin):
 
     @classmethod
     def get_by_ip(cls, vrf, ip, reql=False):
-        query = cls.filter(filter_in_subnet(ip, r.row), reql=True) \
+        query = cls.filter(lambda b:
+                    r.ip_prefix_contains(
+                        r.ip_prefix(b['network'], b['length']),
+                        r.ip_address(ip)
+                    ), reql=True) \
                 .filter({'vrf': vrf}) \
                 .order_by(r.desc("length")).nth(0)
         if reql:
@@ -124,7 +114,11 @@ class IPBlockSerializer(HistorySerializerMixin):
 
     @classmethod
     def filter_by_block(cls, block, reql=False):
-        return cls.filter(filter_in_subnet(r.row['network'], block), reql=reql)
+        return cls.filter(lambda b:
+            r.ip_prefix_contains(
+                r.ip_prefix(block['network'], block['length']),
+                r.ip_address(b['network'])
+            ), reql=reql)
 
     def validate(self, data):
         data = super(IPBlockSerializer, self).validate(data)
@@ -195,11 +189,19 @@ class IPPrefixSerializer(BonkTriggerMixin, HistorySerializerMixin):
 
     @classmethod
     def filter_by_block(cls, block, reql=False):
-        return cls.filter(filter_in_subnet(r.row['network'], block), reql=reql)
+        return cls.filter(lambda p:
+            r.ip_prefix_contains(
+                r.ip_prefix(block['network'], block['length']),
+                r.ip_address(p['network'])
+            ), reql=reql)
 
     @classmethod
     def get_by_ip(cls, vrf, ip, reql=False):
-        query = cls.filter(filter_in_subnet(ip, r.row), reql=True) \
+        query = cls.filter(lambda p:
+                r.ip_prefix_contains(
+                    r.ip_prefix(p['network'], p['length']),
+                    r.ip_address(ip)
+                ), reql=True) \
                 .filter({'vrf': vrf}) \
                 .order_by(r.desc("length")).nth(0)
         if reql:
@@ -298,7 +300,12 @@ class IPAddressSerializer(BonkTriggerMixin, HistorySerializerMixin):
 
     @classmethod
     def filter_by_prefix(cls, prefix, reql=False):
-        return cls.filter(filter_in_subnet(r.row['ip'], prefix), reql=reql)
+        return cls.filter(lambda a:
+            r.ip_prefix_contains(
+                r.ip_prefix(prefix['network'], prefix['length']),
+                r.ip_address(a['ip'])
+            ),
+        reql=reql)
 
     def validate_name(self, value):
         possibles = []

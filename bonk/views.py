@@ -210,21 +210,24 @@ class IPAddressListView(RethinkAPIMixin, generics.ListCreateAPIView):
         if self.request.user.is_superuser:
             return queryset
         groups = self.request.user.groups.all().values_list('name', flat=True)
-        prefixes = list(
-            reduce(lambda x, y: x.union(y),
+        ip_addresses = reduce(lambda x, y: x.union(y),
+                [IPAddressSerializer.filter(reql=True).get_all(*groups, index=i)
+                    for i in ['permissions_read', 'permissions_create', 'permissions_write']
+                ]
+            ).distinct()
+        from_prefixes = reduce(lambda x, y: x.union(y),
                 [IPPrefixSerializer.filter(reql=True).get_all(*groups, index=i)
                     for i in ['permissions_read', 'permissions_create', 'permissions_write']
                 ]
-            ).distinct().run(self.get_connection())
-        )
-        querysets = [IPAddressSerializer.filter_by_prefix(prefix, reql=True)
-            for prefix in prefixes
-        ] + [IPAddressSerializer.filter(reql=True).get_all(*groups, index=i)
-            for i in ['permissions_read', 'permissions_create', 'permissions_write']
-        ]
-        queryset = reduce(lambda x, y: x.union(y), querysets)
-        queryset = queryset.distinct()
-        return queryset
+            ).distinct().merge(
+                lambda p: {"ip_prefix": r.ip_prefix(p['network'], p['length'])}
+            ).inner_join(
+                r.table("ip_address").merge(
+                    lambda a: {"ip_address": r.ip_address(a['ip'])}
+                ),
+                lambda p, a: r.ip_prefix_contains(p['ip_prefix'], a['ip_address'])
+            ).without("left").merge({"left": {}}).zip()
+        return from_prefixes.union(ip_addresses).distinct()
 
 class IPAddressDetailView(RethinkAPIMixin, generics.RetrieveUpdateDestroyAPIView):
     serializer_class = IPAddressSerializer
