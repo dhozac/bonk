@@ -5,7 +5,7 @@ import os
 import re
 
 setup(name='bonk',
-      version='0.3.0',
+      version='0.3.1',
       description='Simple IPAM',
       author='Klarna IT Operations Core Services',
       author_email='itops.core-services@klarna.com',
