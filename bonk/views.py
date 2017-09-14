@@ -107,7 +107,7 @@ class IPBlockAllocateView(RethinkAPIMixin, generics.CreateAPIView):
             for prefix in available.iter_cidrs():
                 if prefix.prefixlen == length:
                     break
-                elif prefix.prefixlen < length and (larger is None or larger.prefixlen > prefix.prefixlen):
+                elif prefix.prefixlen < length and (larger is None or larger.prefixlen < prefix.prefixlen):
                     larger = prefix
             else:
                 if larger is None:
