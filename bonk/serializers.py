@@ -318,7 +318,11 @@ class IPAddressSerializer(BonkTriggerMixin, HistorySerializerMixin):
             raise serializers.ValidationError("no zone matching %s could be found" % value)
         if 'request' in self.context and not self.context['request'].user.is_superuser:
             user_groups = set(self.context['request'].user.groups.all().values_list('name', flat=True))
-            if len(user_groups.intersection(set(
+            if self.instance is not None and len(user_groups.intersection(set(
+                    self.instance.get('permissions', {}).get('write', [])
+                ))) > 0:
+                pass
+            elif len(user_groups.intersection(set(
                     zone.get('permissions', {}).get('create', []) +
                     zone.get('permissions', {}).get('write', [])
                 ))) == 0:
@@ -442,7 +446,11 @@ class DNSRecordSerializer(NeedsReviewMixin, BonkTriggerMixin, HistorySerializerM
             raise serializers.ValidationError("'%s' does not exist" % value)
         if 'request' in self.context and not self.context['request'].user.is_superuser:
             user_groups = set(self.context['request'].user.groups.all().values_list('name', flat=True))
-            if len(user_groups.intersection(set(
+            if self.instance is not None and len(user_groups.intersection(set(
+                    self.instance.get('permissions', {}).get('write', [])
+                ))) > 0:
+                pass
+            elif len(user_groups.intersection(set(
                     self._zone.instance.get('permissions', {}).get('create', []) +
                     self._zone.instance.get('permissions', {}).get('write', [])
                 ))) == 0:
