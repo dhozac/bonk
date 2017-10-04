@@ -250,14 +250,25 @@ class IPPrefixSerializer(BonkTriggerMixin, HistorySerializerMixin):
         import bonk.tasks
         data = super(IPPrefixSerializer, self).create(data)
         block = IPBlockSerializer.get_by_ip(data['vrf'], data['network'])
-        if 'announced_by' in block:
+        if 'announced_by' in block and data['state'] == 'allocated':
             bonk.tasks.trigger_prefix_create.apply_async((data, block))
         return data
+
+    def update(self, instance, data):
+        import bonk.tasks
+        ret = super(IPPrefixSerializer, self).update(instance, data)
+        block = IPBlockSerializer.get_by_ip(data['vrf'], data['network'])
+        if 'announced_by' in block:
+            if instance['state'] != 'allocated' and data['state'] == 'allocated':
+                bonk.tasks.trigger_prefix_create.apply_async((ret, block))
+            elif instance['state'] == 'allocated' and data['state'] != 'allocated':
+                bonk.tasks.trigger_prefix_delete.apply_async((ret, block))
+        return ret
 
     def delete(self):
         import bonk.tasks
         block = IPBlockSerializer.get_by_ip(self.instance['vrf'], self.instance['network'])
-        if 'announced_by' in block:
+        if 'announced_by' in block and self.instance['state'] == 'allocated':
             bonk.tasks.trigger_prefix_delete.apply_async((self.instance, block))
         ret = super(IPPrefixSerializer, self).delete()
         return ret
