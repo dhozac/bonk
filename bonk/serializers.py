@@ -293,6 +293,8 @@ class IPAddressSerializer(BonkTriggerMixin, HistorySerializerMixin):
     dhcp_mac = serializers.ListField(child=serializers.CharField(validators=[validate_mac]), required=False)
     reference = serializers.CharField(required=False)
     permissions = PermissionsSerializer(required=False)
+    ttl = serializers.IntegerField(required=False)
+    # TODO: add TTL support to reverse zone generation in iscbrf
 
     class Meta(RethinkSerializer.Meta):
         table_name = 'ip_address'
