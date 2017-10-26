@@ -18,6 +18,7 @@ from rest_framework import serializers
 import netaddr
 import re
 from django_rethink import r, RethinkSerializer, RethinkObjectNotFound, RethinkMultipleObjectsFound, validate_unique_key, get_connection, HistorySerializerMixin, NeedsReviewMixin, PermissionsSerializer
+from django_rethink.tasks import rethinkdb_lock, rethinkdb_unlock
 
 def validate_group_name(group_name):
     try:
@@ -38,19 +39,28 @@ class BonkTriggerMixin(object):
     def create(self, data):
         import bonk.tasks
         data = super(BonkTriggerMixin, self).create(data)
-        bonk.tasks.trigger_dns_dhcp_rebuild.apply_async((data,))
+        task = rethinkdb_lock.s(name='trigger_dns_dhcp_rebuild') | \
+            bonk.tasks.trigger_dns_dhcp_rebuild.si(data) | \
+            rethinkdb_unlock.si(name='trigger_dns_dhcp_rebuild')
+        task.apply_async()
         return data
 
     def update(self, instance, data):
         import bonk.tasks
         data = super(BonkTriggerMixin, self).update(instance, data)
-        bonk.tasks.trigger_dns_dhcp_rebuild.apply_async((data,))
+        task = rethinkdb_lock.s(name='trigger_dns_dhcp_rebuild') | \
+            bonk.tasks.trigger_dns_dhcp_rebuild.si(data) | \
+            rethinkdb_unlock.si(name='trigger_dns_dhcp_rebuild')
+        task.apply_async()
         return data
 
     def delete(self):
         import bonk.tasks
         ret = super(BonkTriggerMixin, self).delete()
-        bonk.tasks.trigger_dns_dhcp_rebuild.apply_async((self.instance,))
+        task = rethinkdb_lock.s(name='trigger_dns_dhcp_rebuild') | \
+            bonk.tasks.trigger_dns_dhcp_rebuild.si(data) | \
+            rethinkdb_unlock.si(name='trigger_dns_dhcp_rebuild')
+        task.apply_async()
         return ret
 
 class VRFSerializer(HistorySerializerMixin):
