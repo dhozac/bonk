@@ -484,6 +484,27 @@ class APITests(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn('already in use', response.content)
 
+    def test_ip_address_allocate_ttl(self):
+        auth = self.create_common_objects()
+        user1_auth = self.create_user('user1', is_superuser=False, groups=['group1'])
+        ip_block = self.create_ip_block(auth, 0, '10.0.0.0', 16, permissions={'create': ['group1']})
+        zone = self.create_zone(auth, 'my.zone', permissions={'write': ['group1']})
+        ip_prefix1 = self.allocate_ip_prefix(user1_auth, 0, '10.0.0.0', 16, length=24, name='prefix1', permissions={'write': ['group1']})
+        response = self.client.post(reverse('bonk:prefix_allocate', kwargs={
+                'vrf': 0,
+                'network': ip_prefix1['network'],
+                'length': ip_prefix1['length']
+            }), data=json.dumps({
+                'vrf': 0,
+                'ip': '10.0.0.2',
+                'name': 'test1.my.zone',
+                'state': 'allocated',
+                'ttl': 300,
+            }), content_type="application/json", HTTP_AUTHORIZATION=user1_auth)
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.content)
+        self.assertIn(300, data['ttl'])
+
     def test_ip_address_detail(self):
         auth = self.create_common_objects()
         user1_auth = self.create_user('user1', is_superuser=False, groups=['group1'])
