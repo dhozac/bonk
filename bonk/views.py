@@ -184,7 +184,7 @@ class IPPrefixAllocateView(RethinkAPIMixin, generics.CreateAPIView):
                 'ip': str(address),
                 'name': self.request.data['name'],
             }
-            for field in ['reference', 'permissions', 'dhcp_mac']:
+            for field in ['reference', 'permissions', 'dhcp_mac', 'ttl']:
                 if field in self.request.data:
                     obj[field] = self.request.data[field]
             serializer = IPAddressSerializer(None, data=obj, context={'request': self.request})

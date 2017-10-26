@@ -283,6 +283,10 @@ def validate_fqdn(value):
     if validate_fqdn_re.match(value) is None:
         raise serializers.ValidationError("%s is not a valid FQDN" % value)
 
+def validate_ttl(value):
+    if value.bit_length() > 32:
+        raise serializers.ValidationError("%s can't be larger than 32 bits" % value)
+
 class IPAddressSerializer(BonkTriggerMixin, HistorySerializerMixin):
     id = serializers.CharField(required=False)
     tags = serializers.DictField(required=False)
@@ -293,6 +297,7 @@ class IPAddressSerializer(BonkTriggerMixin, HistorySerializerMixin):
     dhcp_mac = serializers.ListField(child=serializers.CharField(validators=[validate_mac]), required=False)
     reference = serializers.CharField(required=False)
     permissions = PermissionsSerializer(required=False)
+    ttl = serializers.IntegerField(required=False, validators=[validate_ttl])
 
     class Meta(RethinkSerializer.Meta):
         table_name = 'ip_address'
@@ -376,7 +381,7 @@ class DNSZoneSerializer(NeedsReviewMixin, BonkTriggerMixin, HistorySerializerMix
     type = serializers.ChoiceField(required=True, choices=['internal', 'external'])
     name = serializers.CharField(required=True, validators=[validate_fqdn])
     soa = DNSSOASerializer(required=False)
-    ttl = serializers.IntegerField(required=False)
+    ttl = serializers.IntegerField(required=False, validators=[validate_ttl])
     options = DNSZoneOptionsSerializer(required=False)
     permissions = PermissionsSerializer(required=False)
 
@@ -420,7 +425,7 @@ class DNSRecordSerializer(NeedsReviewMixin, BonkTriggerMixin, HistorySerializerM
     name = serializers.CharField(required=True, validators=[validate_fqdn])
     zone = serializers.CharField(required=True)
     type = serializers.ChoiceField(choices=['A', 'AAAA', 'CNAME', 'MX', 'NS', 'PTR', 'SRV', 'TXT'], required=True)
-    ttl = serializers.IntegerField(required=False)
+    ttl = serializers.IntegerField(required=False, validators=[validate_ttl])
     value = serializers.ListField(child=serializers.CharField())
     reference = serializers.CharField(required=False)
     permissions = PermissionsSerializer(required=False)
