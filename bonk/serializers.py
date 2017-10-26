@@ -381,7 +381,7 @@ class DNSZoneSerializer(NeedsReviewMixin, BonkTriggerMixin, HistorySerializerMix
     type = serializers.ChoiceField(required=True, choices=['internal', 'external'])
     name = serializers.CharField(required=True, validators=[validate_fqdn])
     soa = DNSSOASerializer(required=False)
-    ttl = serializers.IntegerField(required=False)
+    ttl = serializers.IntegerField(required=False, validators=[validate_ttl])
     options = DNSZoneOptionsSerializer(required=False)
     permissions = PermissionsSerializer(required=False)
 
@@ -425,7 +425,7 @@ class DNSRecordSerializer(NeedsReviewMixin, BonkTriggerMixin, HistorySerializerM
     name = serializers.CharField(required=True, validators=[validate_fqdn])
     zone = serializers.CharField(required=True)
     type = serializers.ChoiceField(choices=['A', 'AAAA', 'CNAME', 'MX', 'NS', 'PTR', 'SRV', 'TXT'], required=True)
-    ttl = serializers.IntegerField(required=False)
+    ttl = serializers.IntegerField(required=False, validators=[validate_ttl])
     value = serializers.ListField(child=serializers.CharField())
     reference = serializers.CharField(required=False)
     permissions = PermissionsSerializer(required=False)

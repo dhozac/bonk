@@ -154,6 +154,9 @@ that a device with multiple addresses will need multiple hostnames.
 - dhcp_mac
   * List of MAC addresses in de:ad:be:ef:f0:0d format that the
     device will use to request a static DHCP lease for this address.
+- ttl
+  * Optional field to override the default time-to-live for this
+    record.
 - permissions
   - read
     * A list of groups that should be granted read access to this
