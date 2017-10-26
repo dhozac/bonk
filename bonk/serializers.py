@@ -58,7 +58,7 @@ class BonkTriggerMixin(object):
         import bonk.tasks
         ret = super(BonkTriggerMixin, self).delete()
         task = rethinkdb_lock.s(name='trigger_dns_dhcp_rebuild') | \
-            bonk.tasks.trigger_dns_dhcp_rebuild.si(data) | \
+            bonk.tasks.trigger_dns_dhcp_rebuild.si(self.instance) | \
             rethinkdb_unlock.si(name='trigger_dns_dhcp_rebuild')
         task.apply_async()
         return ret
