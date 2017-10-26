@@ -501,7 +501,7 @@ class APITests(TestCase):
                 'state': 'allocated',
                 'ttl': 300,
             }), content_type="application/json", HTTP_AUTHORIZATION=user1_auth)
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 201)
         data = json.loads(response.content)
         self.assertIn(300, data['ttl'])
 
