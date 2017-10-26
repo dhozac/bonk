@@ -503,7 +503,7 @@ class APITests(TestCase):
             }), content_type="application/json", HTTP_AUTHORIZATION=user1_auth)
         self.assertEqual(response.status_code, 201)
         data = json.loads(response.content)
-        self.assertIn(300, data['ttl'])
+        self.assertEqual(data['ttl'], 300)
 
     def test_ip_address_detail(self):
         auth = self.create_common_objects()
