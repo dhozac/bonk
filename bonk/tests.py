@@ -152,7 +152,6 @@ class APITests(TestCase):
                 }), data=json.dumps(dict(fields,
                     name=name,
                     state=fields.get('state', 'allocated'),
-		    ttl=fields.get('ttl', 3600),
                 )), content_type="application/json", HTTP_AUTHORIZATION=auth)
 
     def allocate_ip_address(self, *args, **fields):
@@ -376,7 +375,7 @@ class APITests(TestCase):
         ip_prefix2 = self.allocate_ip_prefix(user2_auth, 0, '10.0.0.0', 16, length=24, name='prefix2', permissions={'write': ['group2']})
 
         ip1 = self.allocate_ip_address(user1_auth, 0, ip_prefix1['network'], ip_prefix1['length'], 'test1.my.zone')
-        ip2 = self.allocate_ip_address(user2_auth, 0, ip_prefix2['network'], ip_prefix2['length'], 'test2.my.zone', ttl=300)
+        ip2 = self.allocate_ip_address(user2_auth, 0, ip_prefix2['network'], ip_prefix2['length'], 'test2.my.zone')
         self.assertIn(netaddr.IPAddress(ip1['ip']), netaddr.IPNetwork("%s/%d" % (ip_prefix1['network'], ip_prefix1['length'])))
         self.assertIn(netaddr.IPAddress(ip2['ip']), netaddr.IPNetwork("%s/%d" % (ip_prefix2['network'], ip_prefix2['length'])))
 
