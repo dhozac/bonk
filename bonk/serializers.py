@@ -295,7 +295,9 @@ def validate_fqdn(value):
 
 def validate_ttl(value):
     if value.bit_length() > 32:
-        raise serializers.ValidationError("%s can't be larger than 32 bits" % value)
+        raise serializers.ValidationError("TTL can't be larger than 32 bits, value: %s" % value)
+    if value < 0:
+        raise serializers.ValidationError("TTL must be a positive value, value: %s")
 
 class IPAddressSerializer(BonkTriggerMixin, HistorySerializerMixin):
     id = serializers.CharField(required=False)
