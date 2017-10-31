@@ -267,11 +267,11 @@ class IPPrefixSerializer(BonkTriggerMixin, HistorySerializerMixin):
     def update(self, instance, data):
         import bonk.tasks
         ret = super(IPPrefixSerializer, self).update(instance, data)
-        block = IPBlockSerializer.get_by_ip(data['vrf'], data['network'])
+        block = IPBlockSerializer.get_by_ip(ret['vrf'], ret['network'])
         if 'announced_by' in block:
-            if instance['state'] != 'allocated' and data['state'] == 'allocated':
+            if instance['state'] != 'allocated' and ret['state'] == 'allocated':
                 bonk.tasks.trigger_prefix_create.apply_async((ret, block))
-            elif instance['state'] == 'allocated' and data['state'] != 'allocated':
+            elif instance['state'] == 'allocated' and ret['state'] != 'allocated':
                 bonk.tasks.trigger_prefix_delete.apply_async((ret, block))
         return ret
 
