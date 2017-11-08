@@ -179,6 +179,7 @@ class IPPrefixSerializer(BonkTriggerMixin, HistorySerializerMixin):
     dhcp = IPPrefixDHCPSerializer(required=False)
     ddns = IPPrefixDDNSSerializer(required=False)
     reference = serializers.CharField(required=False)
+    inventory_id = serializers.CharField(required=False)
 
     class Meta(RethinkSerializer.Meta):
         table_name = 'ip_prefix'
