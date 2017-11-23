@@ -48,13 +48,38 @@ def trigger_prefix_create(prefix, block):
             }
         )
         if response.status_code != 200:
-            raise Exception("unable to find firewall %s in Socrates" % domain)
+            raise Exception("unable to find firewall %s in Socrates: %r" %
+                (domain, response.json()))
         firewalls = response.json()
+
         switch_domains = set()
+        # Add switches which are directly connected to firewalls
         for firewall in firewalls:
             for nic in firewall.get('nics', []):
                 if 'remote' in nic and 'domain' in nic['remote']:
                     switch_domains.add(nic['remote']['domain'])
+
+        # Find and add switches with the same configuration endpoint
+        switch_urls = set()
+        for switch_domain in switch_domains:
+            response = socrates_request("get",
+                "https://%s/asset/?switch__domain=%s" % (url.netloc, switch_domain))
+            if response.status_code != 200:
+                raise Exception("unable to find switch for domain %s in Socrates: %r" %
+                    (switch_domain, response.json()))
+            for switch_asset in response.json():
+                switch_urls.add(switch_asset['url'])
+
+        for switch_url in switch_urls:
+            response = socrates_request("get",
+                "https://%s/asset/?url=%s" % (url.netloc, switch_url))
+            if response.status_code != 200:
+                raise Exception("unable to find switch for URL %s in Socrates: %r" %
+                    (switch_url, response.json()))
+            for switch_asset in response.json():
+                switch_domains.add(switch_asset['switch']['domain'])
+
+        # Create network
         data = dict(urlparse.parse_qsl(url.query))
         domains = dict(
             [(domain, {'name': prefix['name'], 'vlan_id': 0, 'data': data})] +
