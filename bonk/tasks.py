@@ -68,7 +68,8 @@ def trigger_prefix_create(prefix, block):
                 raise Exception("unable to find switch for domain %s in Socrates: %r" %
                     (switch_domain, response.json()))
             for switch_asset in response.json():
-                switch_urls.add(switch_asset['url'])
+                if 'url' in switch_asset:
+                    switch_urls.add(switch_asset['url'])
 
         for switch_url in switch_urls:
             response = socrates_request("get",
@@ -77,7 +78,8 @@ def trigger_prefix_create(prefix, block):
                 raise Exception("unable to find switch for URL %s in Socrates: %r" %
                     (switch_url, response.json()))
             for switch_asset in response.json():
-                switch_domains.add(switch_asset['switch']['domain'])
+                if 'switch' in switch_asset and 'domain' in switch_asset['switch']:
+                    switch_domains.add(switch_asset['switch']['domain'])
 
         # Create network
         data = dict(urlparse.parse_qsl(url.query))
