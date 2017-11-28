@@ -127,7 +127,10 @@ class IPBlockAllocateView(RethinkAPIMixin, generics.CreateAPIView):
                     obj[field] = self.request.data[field]
             serializer = IPPrefixSerializer(None, data=obj, context={'request': self.request})
             serializer.is_valid(raise_exception=True)
-            return Response(serializer.save(), status=status.HTTP_201_CREATED)
+            if 'dryrun' in self.request.data:
+                return Response(status=status.HTTP_204_NO_CONTENT)
+            else:
+                return Response(serializer.save(), status=status.HTTP_201_CREATED)
         finally:
             rethinkdb_unlock.apply_async(tuple(), {'name': lock_name, 'token': lock_token})
 
@@ -189,7 +192,10 @@ class IPPrefixAllocateView(RethinkAPIMixin, generics.CreateAPIView):
                     obj[field] = self.request.data[field]
             serializer = IPAddressSerializer(None, data=obj, context={'request': self.request})
             serializer.is_valid(raise_exception=True)
-            return Response(serializer.save(), status=status.HTTP_201_CREATED)
+            if 'dryrun' in self.request.data:
+                return Response(status=status.HTTP_204_NO_CONTENT)
+            else:
+                return Response(serializer.save(), status=status.HTTP_201_CREATED)
         finally:
             rethinkdb_unlock.apply_async(tuple(), {'name': lock_name, 'token': lock_token})
 
