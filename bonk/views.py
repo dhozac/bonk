@@ -190,7 +190,10 @@ class IPPrefixAllocateView(RethinkAPIMixin, generics.CreateAPIView):
             for field in ['reference', 'permissions', 'dhcp_mac', 'ttl']:
                 if field in self.request.data:
                     obj[field] = self.request.data[field]
-            serializer = IPAddressSerializer(None, data=obj, context={'request': self.request})
+            previous = None
+            if 'id' in self.request.data:
+                previous = IPAddressSerializer.get(id=self.request.data['id'])
+            serializer = IPAddressSerializer(previous, data=obj, context={'request': self.request})
             serializer.is_valid(raise_exception=True)
             if 'dryrun' in self.request.data:
                 return Response(status=status.HTTP_204_NO_CONTENT)
