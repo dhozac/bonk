@@ -171,7 +171,13 @@ class IPPrefixAllocateView(RethinkAPIMixin, generics.CreateAPIView):
             if prefix['length'] <= 30:
                 used.add(network.network)
                 used.add(network.broadcast)
-            available = netaddr.IPSet(network) ^ used
+
+            previous = None
+            if 'id' in self.request.data:
+                previous = IPAddressSerializer.get(id=self.request.data['id'])
+                used.remove(previous['ip'])
+
+            available = netaddr.IPSet(network) - used
             if 'ip' not in self.request.data:
                 for address in available:
                     break
@@ -190,9 +196,6 @@ class IPPrefixAllocateView(RethinkAPIMixin, generics.CreateAPIView):
             for field in ['reference', 'permissions', 'dhcp_mac', 'ttl']:
                 if field in self.request.data:
                     obj[field] = self.request.data[field]
-            previous = None
-            if 'id' in self.request.data:
-                previous = IPAddressSerializer.get(id=self.request.data['id'])
             serializer = IPAddressSerializer(previous, data=obj, context={'request': self.request})
             serializer.is_valid(raise_exception=True)
             if 'dryrun' in self.request.data:
