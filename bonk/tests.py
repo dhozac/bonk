@@ -14,6 +14,7 @@
 
 import base64
 import json
+import os
 import netaddr
 from django.test import TestCase, override_settings
 from django.conf import settings
@@ -27,7 +28,7 @@ import rethinkdb as r
 from bonk.serializers import *
 
 @override_settings(
-    RETHINK_DB_DB='bonkci',
+    RETHINK_DB_DB=os.environ.get('RETHINK_DB_DB', 'bonkci'),
     CELERY_TASK_EAGER_PROPAGATES=True,
     CELERY_TASK_ALWAYS_EAGER=True,
     CELERY_BROKER_URL='memory://',
