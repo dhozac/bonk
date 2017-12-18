@@ -80,6 +80,9 @@ def trigger_prefix_create(prefix, block):
             for switch_asset in response.json():
                 if 'switch' in switch_asset and 'domain' in switch_asset['switch']:
                     switch_domains.add(switch_asset['switch']['domain'])
+                for nic in switch_asset.get('nics', []):
+                    if 'remote' in nic and 'domain' in nic['remote']:
+                        switch_domains.add(nic['remote']['domain'])
 
         # Create network
         data = dict(urlparse.parse_qsl(url.query))
