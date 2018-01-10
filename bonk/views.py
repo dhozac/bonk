@@ -87,7 +87,7 @@ class IPBlockAllocateView(RethinkAPIMixin, generics.CreateAPIView):
             raise serializers.ValidationError("permissions is required")
         lock_token = str(uuid.uuid4())
         lock_name = "block-allocate-%s-%d" % (block['network'], block['length'])
-        result = rethinkdb_lock.apply_async(tuple(), {'name': lock_name, 'token': lock_token})
+        result = rethinkdb_lock.apply_async(tuple(), {'name': lock_name, 'token': lock_token, 'timeout': 30})
         result.get()
         try:
             pool = netaddr.IPSet([netaddr.IPNetwork("%s/%d" % (block['network'], block['length']))])
@@ -161,7 +161,7 @@ class IPPrefixAllocateView(RethinkAPIMixin, generics.CreateAPIView):
             raise serializers.ValidationError("name is required")
         lock_token = str(uuid.uuid4())
         lock_name = "prefix-allocate-%s-%d" % (prefix['network'], prefix['length'])
-        result = rethinkdb_lock.apply_async(tuple(), {'name': lock_name, 'token': lock_token})
+        result = rethinkdb_lock.apply_async(tuple(), {'name': lock_name, 'token': lock_token, 'timeout': 30})
         result.get()
         try:
             network = netaddr.IPNetwork("%s/%d" % (prefix['network'], prefix['length']))
