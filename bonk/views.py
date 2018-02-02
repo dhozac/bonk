@@ -87,8 +87,9 @@ class IPBlockAllocateView(RethinkAPIMixin, generics.CreateAPIView):
             raise serializers.ValidationError("permissions is required")
         lock_token = str(uuid.uuid4())
         lock_name = "block-allocate-%s-%d" % (block['network'], block['length'])
-        result = rethinkdb_lock.apply_async(tuple(), {'name': lock_name, 'token': lock_token, 'timeout': 30})
-        result.get()
+        if 'dryrun' not in self.request.data:
+            result = rethinkdb_lock.apply_async(tuple(), {'name': lock_name, 'token': lock_token, 'timeout': 30})
+            result.get()
         try:
             pool = netaddr.IPSet([netaddr.IPNetwork("%s/%d" % (block['network'], block['length']))])
             used = netaddr.IPSet()
@@ -132,7 +133,8 @@ class IPBlockAllocateView(RethinkAPIMixin, generics.CreateAPIView):
             else:
                 return Response(serializer.save(), status=status.HTTP_201_CREATED)
         finally:
-            rethinkdb_unlock.apply_async(tuple(), {'name': lock_name, 'token': lock_token})
+            if 'dryrun' not in self.request.data:
+                rethinkdb_unlock.apply_async(tuple(), {'name': lock_name, 'token': lock_token})
 
 class IPPrefixListView(RethinkAPIMixin, generics.ListCreateAPIView):
     serializer_class = IPPrefixSerializer
@@ -161,8 +163,9 @@ class IPPrefixAllocateView(RethinkAPIMixin, generics.CreateAPIView):
             raise serializers.ValidationError("name is required")
         lock_token = str(uuid.uuid4())
         lock_name = "prefix-allocate-%s-%d" % (prefix['network'], prefix['length'])
-        result = rethinkdb_lock.apply_async(tuple(), {'name': lock_name, 'token': lock_token, 'timeout': 30})
-        result.get()
+        if 'dryrun' not in self.request.data:
+            result = rethinkdb_lock.apply_async(tuple(), {'name': lock_name, 'token': lock_token, 'timeout': 30})
+            result.get()
         try:
             network = netaddr.IPNetwork("%s/%d" % (prefix['network'], prefix['length']))
             used = netaddr.IPSet()
@@ -203,7 +206,8 @@ class IPPrefixAllocateView(RethinkAPIMixin, generics.CreateAPIView):
             else:
                 return Response(serializer.save(), status=status.HTTP_201_CREATED)
         finally:
-            rethinkdb_unlock.apply_async(tuple(), {'name': lock_name, 'token': lock_token})
+            if 'dryrun' not in self.request.data:
+                rethinkdb_unlock.apply_async(tuple(), {'name': lock_name, 'token': lock_token})
 
 class HasAddressPermission(RethinkSerializerPermission):
     def has_object_permission(self, request, view, obj):
