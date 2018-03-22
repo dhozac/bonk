@@ -1,0 +1,113 @@
+#!/usr/bin/python -tt
+#
+# Copyright 2017 Klarna AB
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import requests
+
+
+def main():
+    module = AnsibleModule(
+        argument_spec = dict(
+            state = dict(type='str', default='present', choices=['present', 'absent']),
+            servers = dict(type='list', default=[]),
+            username = dict(type='str', required=True),
+            password = dict(type='str', required=True, no_log=True),
+            vrf = dict(type='int', required=False, default=0),
+            network = dict(type='str', required=False),
+            length = dict(type='int', required=False),
+            name = dict(type='str', required=False),
+            ip = dict(type='str', required=False),
+            permissions = dict(type='dict', required=False),
+            dhcp_mac = dict(type='list', required=False),
+            reference = dict(type='str', required=False),
+        ),
+        supports_check_mode = True
+    )
+
+    changed = False
+    req_args = {
+        'auth': (module.params['username'], module.params['password']),
+        'headers': {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+        },
+    }
+    def request(method, path, data=None, params=None):
+        method_fun = getattr(requests, method)
+        exc = None
+        for server in module.params['servers']:
+            try:
+                url = "https://%s%s" % (server, path)
+                if data:
+                    response = method_fun(url, params=params, data=json.dumps(data), **req_args)
+                else:
+                    response = method_fun(url, params=params, **req_args)
+                if response.status_code >= 500 and response.status_code < 600:
+                    pass
+                else:
+                    return response
+            except requests.exceptions.RequestException, e:
+                exc = e
+        module.fail_json(msg="failed to talk to bonk: %s" % exc)
+
+    if module.params['name']:
+        response = request('get', '/bonk/address/', params={
+            'name': module.params['name']
+        })
+        data = response.json()
+
+    if module.params['state'] == 'present':
+        if not all([module.params[i] for i in ['name', 'network', 'length']]):
+            module.fail_json(msg="name, network, and length parameters are required when state=present")
+        if len(data) > 0:
+            # FIXME: should ensure the fields are identical
+            pass
+        else:
+            changed = True
+            if not module.check_mode:
+                data = {
+                    'name': module.params['name'],
+                }
+                for field in ['ip', 'permissions', 'dhcp_mac', 'reference']:
+                    if field in module.params and module.params[field]:
+                        data[field] = module.params[field]
+                response = request('post', "/bonk/prefix/%d/%s/%d/allocate" %
+                    (module.params['vrf'], module.params['network'], module.params['length']),
+                    data=data)
+                if response.status_code != 201:
+                    module.fail_json(msg="failed to allocate address", status_code=response.status_code, body=response.text)
+
+    elif module.params['state'] == 'absent':
+        if not module.params['name'] and not module.params['ip']:
+            module.fail_json(msg="name or ip parameter is required when state=absent")
+        if module.params['ip']:
+            response = request('get', "/bonk/address/%d/%s/" % (module.params['vrf'], module.params['ip']))
+            data = [response.json()]
+        if len(data) > 0:
+            changed = True
+            if not module.check_mode:
+                response = request('delete', "/bonk/address/%d/%s/" %
+                    (module.params['vrf'], data[0]['ip']))
+                if response.status_code != 204:
+                    module.fail_json(msg="failed to delete address", status_code=response.status_code, body=response.text)
+        else:
+            pass
+
+    module.exit_json(changed=changed)
+
+# import module snippets
+from ansible.module_utils.basic import *
+if __name__ == "__main__":
+    main()
