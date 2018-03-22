@@ -1,0 +1,9 @@
+{% for zone in zones %}
+zone "{{ zone.name }}" {{ '{' }}
+	type slave;
+	file "slaves/{{ zone.name }}";
+	masters {{ '{' }}
+		{% for master in slave_masters %}{{ master }}; {% endfor %}
+	{{ '}' }};
+{{ '}' }};
+{% endfor %}
