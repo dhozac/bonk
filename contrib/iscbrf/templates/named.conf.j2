@@ -1,0 +1,40 @@
+{% for zone in zones %}
+{% if zone.options and zone.options.ddns %}
+key {{ zone.options.ddns.name }} {
+	algorithm {{ zone.options.ddns.algorithm }};
+	secret "{{ zone.options.ddns.key }}";
+};
+{% endif %}
+zone "{{ zone.name }}" {{ '{' }}
+	{% if zone.options and zone.options.masters %}
+		type slave;
+		file "slaves/{{ zone.name }}";
+		masters {{ '{' }}
+			{% for master in zone.options.masters %}{{ master }}; {% endfor %}
+		{{ '}' }};
+	{% elif zone.options and zone.options.forwarders %}
+		type forward;
+		forward only;
+		forwarders {{ '{' }}
+			{% for forwarder in zone.options.forwarders %}
+				{{ forwarder }};
+			{% endfor %}
+		{{ '}' }};
+	{% else %}
+		type master;
+		{% if zone.options and zone.options.ddns %}
+			file "dynamic/{{ zone.name }}";
+			allow-update { key {{ zone.options.ddns.name }}; };
+                {% else %}
+			file "{{ zone_path }}/{{ zone.name }}";
+		{% endif %}
+	{% endif %}
+	{% if zone.options and zone.options.notify %}
+		also-notify {{ '{' }}
+			{% for notifier in zone.options.notify %}
+				{{ notifier }};
+			{% endfor %}
+		{{ '}' }};
+	{% endif %}
+{{ '}' }};
+{% endfor %}

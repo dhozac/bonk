@@ -1,0 +1,47 @@
+{% for prefix in prefixes %}
+{% if prefix.dhcp and prefix.dhcp.enabled %}
+{% if prefix.ddns and prefix.ddns.key %}
+key {{ prefix.ddns.name }} {{ '{' }}
+	algorithm {{ prefix.ddns.algorithm }};
+	secret {{ prefix.ddns.key }};
+{{ '}' }}
+zone {{ prefix.ddns.zone }}. {{ '{' }}
+	primary {{ prefix.ddns.server }};
+	key {{ prefix.ddns.name }};
+{{ '}' }}
+{% endif %}
+
+subnet {{ prefix.network }} netmask {{ prefix.length|netmask }} {{ '{' }}
+	authoritative;
+	{% if prefix.dhcp.range %}
+	pool {
+		range {{ prefix.dhcp.range[0] }} {{ prefix.dhcp.range[1] }};
+		failover peer "failover-partner";
+	}
+	{% endif %}
+	{% if prefix.ddns and prefix.ddns.key %}
+	option domain-name "{{ prefix.ddns.zone }}";
+	ddns-updates on;
+	{% endif %}
+	{% if prefix.gateway %}
+	option routers {{ prefix.gateway }};
+	{% endif %}
+	{% if prefix.dhcp.options %}
+		{% for option in prefix.dhcp.options %}
+		{{ option }}
+		{% endfor %}
+	{% endif %}
+{{ '}' }}
+{% endif %}
+{% endfor %}
+
+{% for address in addresses %}
+{% for mac in address.dhcp_mac|default([]) %}
+host {{ address.name }}.{{ loop.index }} {{ '{' }}
+	option host-name "{{ address.name.split(".").0 }}";
+	option domain-name "{{ address.name.split(".", 1).1 }}";
+	hardware ethernet {{ mac }};
+	fixed-address {{ address.ip }};
+{{ '}' }}
+{% endfor %}
+{% endfor %}
