@@ -1,0 +1,153 @@
+#!/usr/bin/python -tt
+#
+# Copyright 2017 Klarna AB
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import json
+import requests
+import re
+from ansible.module_utils.basic import *
+
+
+def main():
+    module = AnsibleModule(
+        argument_spec = dict(
+            state = dict(type='str', default='present', choices=['present', 'absent']),
+            servers = dict(type='list', default=[]),
+            username = dict(type='str', required=True),
+            password = dict(type='str', required=True, no_log=True),
+            zone = dict(type='str', required=False),
+            name = dict(type='str', required=True),
+            type = dict(type='str', required=True),
+            value = dict(type='list', required=False),
+            permissions = dict(type='dict', required=False),
+            log = dict(type='str', required=False),
+            reference = dict(type='str', required=False),
+        ),
+        supports_check_mode = True
+    )
+
+    changed = False
+    req_args = {
+        'auth': (module.params['username'], module.params['password']),
+        'headers': {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+        },
+    }
+
+    def request(method, path, data=None, params=None):
+        method_fun = getattr(requests, method)
+        exc = None
+        for server in module.params['servers']:
+            try:
+                url = "https://{0}/{1}".format(server, path)
+                if data:
+                    response = method_fun(url, params=params, data=json.dumps(data), **req_args)
+                else:
+                    response = method_fun(url, params=params, **req_args)
+                if response.status_code >= 500 and response.status_code < 600:
+                    pass
+                else:
+                    return response
+            except requests.exceptions.RequestException as e:
+                exc = e
+        module.fail_json(msg="failed to talk to bonk: {0}".format(exc))
+
+    diff = {'before': {}, 'after': {}}
+    data = None
+    response = request('get', '/bonk/record/{0}/{1}'.format(module.params['name'], module.params['type']))
+    if response.status_code == 200:
+        data = response.json()
+
+    if module.params['state'] == 'present':
+        # make sure we choke if ansible feeds us unwanted stuff
+        for bad_word in ['[Undefined]']:
+            if bad_word in module.params['value']:
+                module.fail_json(msg="value had an unacceptable value: {0}, check your input".format(bad_word))
+        if not all([module.params[i] for i in ['name', 'zone', 'value', 'type']]):
+            module.fail_json(msg="name, zone, value and type parameters are required when state=present")
+        if module.params['type'] in ['NS', 'CNAME']:
+            # add missing trailing dots
+            rx = re.compile('^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$|[^\s]+\.$')
+            module.params['value'] = [addr if rx.match(addr) else '{0}.'.format(addr) for addr in module.params['value']]
+
+        payload = {}
+        if data:
+            diff['before'] = data
+            for k in data:
+                diff['after'][k] = data[k]
+            if module.params['type'] != data['type']:
+                module.fail_json(msg="Changing record types isn't supported, make current record absent and re-add")
+
+            if module.params['zone'] != data['zone']:
+                module.fail_json(msg="Changing zones isn't supported, create a new record in the correct zone")
+
+            for field in ['value', 'permissions', 'reference']:
+                if field in module.params and module.params[field]:
+                    if module.params[field] != data[field]:
+                        payload[field] = module.params[field]
+                        changed = True
+
+            if module.params['log'] and changed:
+                payload['log'] = module.params['log']
+            else:
+                payload['log'] = '{0} updated {1} record for {2} via ansible'.format(module.params['username'], module.params['type'], module.params['name'])
+
+            diff['after'].update(payload)
+            if not module.check_mode and changed:
+                response = request('patch',
+                        '/bonk/record/{0}/{1}'.format(module.params['name'], module.params['type']),
+                        data=payload
+                    )
+            if response.status_code != 200:
+                module.fail_json(msg="Failed to update record", status_code=response.status_code, body=response.text)
+            module.exit_json(changed=changed, diff=diff)
+        else:
+            changed = True
+            for field in ['name', 'zone', 'type', 'value']:
+                if field in module.params and module.params[field]:
+                    payload[field] = module.params[field]
+
+            if module.params['log']:
+                payload['log'] = module.params['log']
+            else:
+                payload['log'] = '{0} added {1} record for {2} via ansible'.format(module.params['username'], module.params['type'], module.params['name'])
+            diff['before'] = {'state': 'absent'}
+            diff['after'] = payload
+            diff['after']['state'] = module.params['state']
+            if not module.check_mode:
+                response = request('post', "/bonk/record/", data=payload)
+                if response.status_code != 201:
+                    module.fail_json(msg="failed to create {0} for {1}".format(module.params['type'], module.params['name']), status_code=response.status_code, body=response.text)
+
+    elif module.params['state'] == 'absent':
+        if not module.params['name'] and not module.params['type']:
+            module.fail_json(msg="name and type parameters required when state=absent")
+        if data:
+            changed = True
+            diff['before'] = data
+            diff['before']['state'] = 'present'
+            diff['after'] = {'state': module.params['state']}
+            if not module.check_mode:
+                response = request('delete', "/bonk/record/{0}/{1}/".format(module.params['name'], module.params['type']))
+                if response.status_code != 204:
+                    module.fail_json(msg="failed to delete record", status_code=response.status_code, body=response.text)
+        else:
+            pass
+
+    module.exit_json(changed=changed, diff=diff)
+
+if __name__ == "__main__":
+    main()
