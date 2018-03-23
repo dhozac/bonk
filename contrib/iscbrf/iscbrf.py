@@ -209,7 +209,7 @@ if __name__ == '__main__':
                     raise Exception('no match')
                 return name.index('.' + zone)
             except:
-                return sys.maxint
+                return sys.maxsize
         zone['records'].extend([{
             'name': ip['name'],
             'zone': zone['name'],
