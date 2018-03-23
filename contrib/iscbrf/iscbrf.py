@@ -29,33 +29,33 @@ import ConfigParser
 class iscBonk(object):
 
     def __init__(self, config):
-        template_dir = "templates/"
-        if config.has_option("iscbrf", "template_dir"):
-            template_dir = config.get("iscbrf", "template_dir")
-        self.named_template = template_dir + 'named.conf.j2'
-        self.named_slave_template = template_dir + 'named-slave.conf.j2'
-        self.dhcpd_template = template_dir + 'dhcpd.conf.j2'
-        self.zone_template = template_dir + 'zone.j2'
+        os.path.join(template_dir,= 'templates/'
+        if config.has_option('iscbrf', 'template_dir'):
+            os.path.join(template_dir,= config.get('iscbrf', 'template_dir')
+        self.named_template = os.path.join(template_dir, 'named.conf.j2')
+        self.named_slave_template = os.path.join(template_dir, 'named-slave.conf.j2')
+        self.dhcpd_template = os.path.join(template_dir, 'dhcpd.conf.j2')
+        self.zone_template = os.path.join(template_dir, 'zone.j2')
         self.cache_path = '/var/cache/bind/'
-        if config.has_option("iscbrf", "cache_path"):
-            self.cache_path = config.get("iscbrf", "cache_path")
+        if config.has_option('iscbrf', 'cache_path'):
+            self.cache_path = config.get('iscbrf', 'cache_path')
         self.zone_path = '/etc/named/pri/'
-        if config.has_option("iscbrf", "zone_path"):
-            self.zone_path = config.get("iscbrf", "zone_path")
+        if config.has_option('iscbrf', 'zone_path'):
+            self.zone_path = config.get('iscbrf', 'zone_path')
         self.zone_output_path = '/etc/named/pri/'
-        if config.has_option("iscbrf", "zone_output_path"):
-            self.zone_output_path = config.get("iscbrf", "zone_output_path")
+        if config.has_option('iscbrf', 'zone_output_path'):
+            self.zone_output_path = config.get('iscbrf', 'zone_output_path')
         self.default_soa = {
-            'authns': config.get("default_soa", "authns"),
-            'email': config.get("default_soa", "email"),
-            'refresh': config.getint("default_soa", "refresh"),
-            'retry': config.getint("default_soa", "retry"),
-            'expiry': config.getint("default_soa", "expiry"),
-            'nxdomain': config.getint("default_soa", "nxdomain"),
+            'authns': config.get('default_soa', 'authns'),
+            'email': config.get('default_soa', 'email'),
+            'refresh': config.getint('default_soa', 'refresh'),
+            'retry': config.getint('default_soa', 'retry'),
+            'expiry': config.getint('default_soa', 'expiry'),
+            'nxdomain': config.getint('default_soa', 'nxdomain'),
         }
-        self.default_ns = [config.get("default_ns", option) for option in config.options("default_ns")]
-        if config.has_section("slave_masters"):
-            self.slave_masters = [config.get("slave_masters", option) for option in config.options("slave_masters")]
+        self.default_ns = [config.get('default_ns', option) for option in config.options('default_ns')]
+        if config.has_section('slave_masters'):
+            self.slave_masters = [config.get('slave_masters', option) for option in config.options('slave_masters')]
         else:
             self.slave_masters = []
         self.log = logging.getLogger(__name__)
@@ -68,7 +68,7 @@ class iscBonk(object):
             ),
             trim_blocks=True,
             lstrip_blocks=True)
-        j2.filters['netmask'] = lambda x: netaddr.IPNetwork("127.0.0.0/%d" % x).netmask
+        j2.filters['netmask'] = lambda x: netaddr.IPNetwork('127.0.0.0/%d' % x).netmask
 
         r = j2.get_template(os.path.basename(self.dhcpd_template)).render(prefixes=sorted(prefixes, key=lambda x: x['network']), addresses=sorted(addresses, key=lambda x: x['ip']))
 
@@ -150,54 +150,54 @@ class iscBonk(object):
 
         return r
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     config = ConfigParser.SafeConfigParser()
     config.read(sys.argv[1:])
-    server = ""
-    if config.has_option("api", "uri"):
-        server = config.get("api", "uri")
-    username = config.get("api", "username")
-    password = config.get("api", "password")
+    server = ''
+    if config.has_option('api', 'uri'):
+        server = config.get('api', 'uri')
+    username = config.get('api', 'username')
+    password = config.get('api', 'password')
     auth = (username, password)
-    my_type = config.get("iscbrf", "type")
+    my_type = config.get('iscbrf', 'type')
 
-    response = requests.get(server + "zone/", params={'type': my_type}, auth=auth)
+    response = requests.get(server + 'zone/', params={'type': my_type}, auth=auth)
     if response.status_code != 200:
-        print >> sys.stderr, "Failed to get my zones: %r" % response.content
+        print >> sys.stderr, 'Failed to get my zones: %r' % response.content
         sys.exit(1)
     zones = dict([(zone['name'], zone) for zone in response.json()])
 
-    response = requests.get(server + "zone/", auth=auth)
+    response = requests.get(server + 'zone/', auth=auth)
     if response.status_code != 200:
-        print >> sys.stderr, "Failed to get all zones: %r" % response.content
+        print >> sys.stderr, 'Failed to get all zones: %r' % response.content
         sys.exit(1)
     not_my_zones = set([zone['name'] for zone in response.json() if zone['name'] not in zones])
 
-    response = requests.get(server + "prefix/", auth=auth)
+    response = requests.get(server + 'prefix/', auth=auth)
     if response.status_code != 200:
-        print >> sys.stderr, "Failed to get prefixes: %r" % response.content
+        print >> sys.stderr, 'Failed to get prefixes: %r' % response.content
         sys.exit(1)
     prefixes = response.json()
 
-    response = requests.get(server + "address/", params={'state': 'allocated'}, auth=auth)
+    response = requests.get(server + 'address/', params={'state': 'allocated'}, auth=auth)
     if response.status_code != 200:
-        print >> sys.stderr, "Failed to get addresses: %r" % response.content
+        print >> sys.stderr, 'Failed to get addresses: %r' % response.content
         sys.exit(1)
     addresses = response.json()
 
     for zone in zones.values():
-        response = requests.get(server + "record/", params={'zone': zone['name']}, auth=auth)
+        response = requests.get(server + 'record/', params={'zone': zone['name']}, auth=auth)
         if response.status_code != 200:
-            print >> sys.stderr, "Failed to get DNS records for %s: %r" % (zone['name'], response.content)
+            print >> sys.stderr, 'Failed to get DNS records for %s: %r' % (zone['name'], response.content)
             continue
         zone['records'] = response.json()
 
     for zone in zones.values():
-        ips = filter(lambda x: x['name'].endswith("." + zone['name']), addresses)
+        ips = filter(lambda x: x['name'].endswith('.' + zone['name']), addresses)
         def find_or_max(name, zone):
             try:
                 if not name.endswith('.' + zone):
-                    raise Exception("no match")
+                    raise Exception('no match')
                 return name.index('.' + zone)
             except:
                 return sys.maxint
@@ -236,7 +236,7 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
     isc = iscBonk(config)
     named_slave_conf_path = None
-    if config.has_option("iscbrf", "named_slave_conf_path"):
-        named_slave_conf_path = config.get("iscbrf", "named_slave_conf_path")
-    isc.buildBindConfig(zones, config.get("iscbrf", "named_conf_path"), named_slave_conf_path)
-    isc.buildDhcpdConfig(prefixes, addresses, config.get("iscbrf", "dhcpd_conf_path"))
+    if config.has_option('iscbrf', 'named_slave_conf_path'):
+        named_slave_conf_path = config.get('iscbrf', 'named_slave_conf_path')
+    isc.buildBindConfig(zones, config.get('iscbrf', 'named_conf_path'), named_slave_conf_path)
+    isc.buildDhcpdConfig(prefixes, addresses, config.get('iscbrf', 'dhcpd_conf_path'))
