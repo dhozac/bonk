@@ -24,14 +24,17 @@ import netaddr
 import json
 import dns.zone
 import dns.rdatatype
-import ConfigParser
+try:
+    import ConfigParser
+except ImportError as e:
+    import configparser as  ConfigParser
 
 class iscBonk(object):
 
     def __init__(self, config):
-        os.path.join(template_dir,= 'templates/'
+        template_dir= 'templates/'
         if config.has_option('iscbrf', 'template_dir'):
-            os.path.join(template_dir,= config.get('iscbrf', 'template_dir')
+            config.get('iscbrf', 'template_dir')
         self.named_template = os.path.join(template_dir, 'named.conf.j2')
         self.named_slave_template = os.path.join(template_dir, 'named-slave.conf.j2')
         self.dhcpd_template = os.path.join(template_dir, 'dhcpd.conf.j2')
@@ -151,6 +154,12 @@ class iscBonk(object):
         return r
 
 if __name__ == '__main__':
+    logging.basicConfig(
+        format='%(asctime)s - %(name)s - %(levelname)s %(message)s',
+        level=logging.DEBUG
+    )
+    logger = logging.getLogger(__name__)
+
     config = ConfigParser.SafeConfigParser()
     config.read(sys.argv[1:])
     server = ''
@@ -163,32 +172,32 @@ if __name__ == '__main__':
 
     response = requests.get(server + 'zone/', params={'type': my_type}, auth=auth)
     if response.status_code != 200:
-        print >> sys.stderr, 'Failed to get my zones: %r' % response.content
+        logger.error('Failed to get my zones: {0}'.format(response.content))
         sys.exit(1)
     zones = dict([(zone['name'], zone) for zone in response.json()])
 
     response = requests.get(server + 'zone/', auth=auth)
     if response.status_code != 200:
-        print >> sys.stderr, 'Failed to get all zones: %r' % response.content
+        logger.error('Failed to get all zones: {0}'.format(response.content))
         sys.exit(1)
     not_my_zones = set([zone['name'] for zone in response.json() if zone['name'] not in zones])
 
     response = requests.get(server + 'prefix/', auth=auth)
     if response.status_code != 200:
-        print >> sys.stderr, 'Failed to get prefixes: %r' % response.content
+        logger.error('Failed to get prefixes: {0}'.format(response.content))
         sys.exit(1)
     prefixes = response.json()
 
     response = requests.get(server + 'address/', params={'state': 'allocated'}, auth=auth)
     if response.status_code != 200:
-        print >> sys.stderr, 'Failed to get addresses: %r' % response.content
+        logger.error('Failed to get addresses: {0}'.format(response.content))
         sys.exit(1)
     addresses = response.json()
 
     for zone in zones.values():
         response = requests.get(server + 'record/', params={'zone': zone['name']}, auth=auth)
         if response.status_code != 200:
-            print >> sys.stderr, 'Failed to get DNS records for %s: %r' % (zone['name'], response.content)
+            logger.warning('Failed to get DNS records for {0}: {1}'.format(zone['name'], response.content))
             continue
         zone['records'] = response.json()
 
@@ -233,7 +242,6 @@ if __name__ == '__main__':
     for name in flattened:
         zones.pop(name)
 
-    logging.basicConfig(level=logging.DEBUG)
     isc = iscBonk(config)
     named_slave_conf_path = None
     if config.has_option('iscbrf', 'named_slave_conf_path'):
