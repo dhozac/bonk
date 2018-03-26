@@ -9,6 +9,8 @@ before_script:
 - sudo apt install ./rethinkdb_2.3.6+15+g8a9687+dirty~0_amd64.deb
 - sudo cp /etc/rethinkdb/default.conf.sample /etc/rethinkdb/instances.d/instance1.conf
 - sudo invoke-rc.d rethinkdb start
+env:
+- HANDLE_COVERAGE=coveralls
 script: tox
 deploy:
   provider: pypi
