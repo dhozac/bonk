@@ -162,9 +162,7 @@ if __name__ == '__main__':
 
     config = ConfigParser.SafeConfigParser()
     config.read(sys.argv[1:])
-    server = ''
-    if config.has_option('api', 'uri'):
-        server = config.get('api', 'uri')
+    server = config.get('api', 'uri')
     username = config.get('api', 'username')
     password = config.get('api', 'password')
     auth = (username, password)
