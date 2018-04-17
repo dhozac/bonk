@@ -236,7 +236,7 @@ be a single record, with its multiple values in the list.
 - name
   * The name of this record.
 - type
-  * The type of record, one of: A, AAAA, CNAME, MX, NS, PTR, SRV, TXT
+  * The type of record, one of: A, AAAA, CNAME, MX, NS, PTR, SRV, TXT, CAA
 - zone
   * The zone that this record is in.
 - ttl
