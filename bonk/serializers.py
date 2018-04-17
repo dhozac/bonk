@@ -437,7 +437,7 @@ class DNSRecordSerializer(NeedsReviewMixin, BonkTriggerMixin, HistorySerializerM
     id = serializers.CharField(required=False)
     name = serializers.CharField(required=True, validators=[validate_fqdn])
     zone = serializers.CharField(required=True)
-    type = serializers.ChoiceField(choices=['A', 'AAAA', 'CNAME', 'MX', 'NS', 'PTR', 'SRV', 'TXT'], required=True)
+    type = serializers.ChoiceField(choices=['A', 'AAAA', 'CNAME', 'MX', 'NS', 'PTR', 'SRV', 'TXT', 'CAA'], required=True)
     ttl = serializers.IntegerField(required=False, validators=[validate_ttl])
     value = serializers.ListField(child=serializers.CharField())
     reference = serializers.CharField(required=False)
