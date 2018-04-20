@@ -16,6 +16,7 @@ from django.conf import settings
 from django.contrib.auth.models import Group
 from rest_framework import serializers
 import netaddr
+import dns.zone
 import re
 from django_rethink import r, RethinkSerializer, RethinkObjectNotFound, RethinkMultipleObjectsFound, validate_unique_key, get_connection, HistorySerializerMixin, NeedsReviewMixin, PermissionsSerializer
 from django_rethink.tasks import rethinkdb_lock, rethinkdb_unlock
@@ -491,7 +492,6 @@ class DNSRecordSerializer(NeedsReviewMixin, BonkTriggerMixin, HistorySerializerM
         full = self.get_updated_object(data)
         if full['name'] != full['zone'] and not full['name'].endswith('.' + full['zone']):
             raise serializers.ValidationError("name %s is not in zone %s" % (full['name'], full['zone']))
-        # FIXME: Add validation of value for type
         if full['type'] == 'CNAME':
             records = list(DNSRecordSerializer.filter(name=full['name']))
             if self.instance is not None:
@@ -506,6 +506,13 @@ class DNSRecordSerializer(NeedsReviewMixin, BonkTriggerMixin, HistorySerializerM
                 records = filter(lambda x: x['id'] != self.instance['id'], records)
             if len(records) > 0:
                 raise serializers.ValidationError("a CNAME record exists for the specified name already")
+        try:
+            dns.zone.from_text(
+                "\n".join(["%s. IN %s %s" % (full['name'], full['type'], v) for v in full['value']]),
+                origin=full['zone'], check_origin=False
+            )
+        except dns.exception.SyntaxError:
+            raise serializers.ValidationError("value is invalid")
         return data
 
 class DHCPServerSetSerializer(BonkTriggerMixin, HistorySerializerMixin):
