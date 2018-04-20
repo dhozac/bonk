@@ -413,6 +413,14 @@ class DNSZoneSerializer(NeedsReviewMixin, BonkTriggerMixin, HistorySerializerMix
             'name',
         ]
 
+    def validate_name(self, value):
+        if self.instance is not None and self.instance['name'] != value:
+            for record in DNSRecordSerializer.filter(zone=self.instance['name']):
+                raise serializers.ValidationError(
+                    "cannot modify the name of a zone with records"
+                )
+        return value
+
     def validate(self, data):
         data = super(DNSZoneSerializer, self).validate(data)
         if (self.instance is None and
