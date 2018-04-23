@@ -136,6 +136,8 @@ class iscBonk(object):
             lstrip_blocks=True)
 
         r = j2.get_template(os.path.basename(self.zone_template)).render(zone=zone, serial=serial + 1)
+        # Ensure that the zone can be understood by dnspython
+        dns.zone.from_text(r, zone)
 
         if outfile and r:
             if os.path.exists(outfile):
