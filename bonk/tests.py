@@ -556,6 +556,33 @@ class APITests(TestCase):
         root_zone = self.create_zone(auth, 'zone', permissions={'create': ['group1']})
         my_zone = self.create_zone(user1_auth, 'my1.zone', permissions={'write': ['group1']})
 
+    def test_dns_zone_rename_without_records(self):
+        auth = self.create_common_objects()
+        zone = self.create_zone(auth, 'my1.zone')
+        response = self.client.patch(
+            reverse('bonk:zone_detail', kwargs={'slug': zone['name']}),
+            data=json.dumps({
+                'name': 'my2.zone',
+            }),
+            content_type="application/json",
+            HTTP_AUTHORIZATION=auth
+        )
+        self.assertEqual(response.status_code, 200)
+
+    def test_dns_zone_rename_with_records(self):
+        auth = self.create_common_objects()
+        zone = self.create_zone(auth, 'my1.zone')
+        record_apex1 = self.create_record(auth, zone['name'], zone['name'], 'A', ['127.0.0.1'])
+        response = self.client.patch(
+            reverse('bonk:zone_detail', kwargs={'slug': zone['name']}),
+            data=json.dumps({
+                'name': 'my2.zone',
+            }),
+            content_type="application/json",
+            HTTP_AUTHORIZATION=auth
+        )
+        self.assertEqual(response.status_code, 400)
+
     def test_dns_records_list(self):
         auth = self.create_common_objects()
         user1_auth = self.create_user('user1', is_superuser=False, groups=['group1'])
@@ -622,6 +649,15 @@ class APITests(TestCase):
         zone1 = self.create_zone(auth, 'my1.zone', permissions={'write': ['group1']})
         self.create_record(user1_auth, 'service.my1.zone', 'my1.zone', 'CNAME', ['service.my2.zone'])
         response = self._create_record(user1_auth, 'service.my1.zone', 'my1.zone', 'A', ['127.0.0.1'])
+        self.assertEqual(response.status_code, 400)
+        data = json.loads(response.content)
+        self.assertIn('non_field_errors', data)
+
+    def test_dns_records_invalid_a(self):
+        auth = self.create_common_objects()
+        user1_auth = self.create_user('user1', is_superuser=False, groups=['group1'])
+        zone1 = self.create_zone(auth, 'my1.zone', permissions={'write': ['group1']})
+        response = self._create_record(user1_auth, 'service.my1.zone', 'my1.zone', 'A', ['service.my2.zone.'])
         self.assertEqual(response.status_code, 400)
         data = json.loads(response.content)
         self.assertIn('non_field_errors', data)
