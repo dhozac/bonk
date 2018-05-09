@@ -13,7 +13,7 @@ service rethinkdb start
 ```
 Install Bonk and it's dependencies through pip
 ```
-python -m pip install "django<2
+pip install "django<2"
 pip install gevent
 pip install gunicorn
 pip install bonk
