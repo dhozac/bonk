@@ -508,6 +508,9 @@ class DNSRecordSerializer(NeedsReviewMixin, BonkTriggerMixin, HistorySerializerM
                 raise serializers.ValidationError("a CNAME record cannot be used on a name with any other record type")
             if len(full['value']) > 1:
                 raise serializers.ValidationError("a CNAME record can only have one value")
+            addresses = list(IPAddressSerializer.filter(name=full['name']))
+            if len(addresses) > 0:
+                raise serializers.ValidationError("an address with the same name already exists")
         else:
             records = list(DNSRecordSerializer.filter(name=full['name'], type='CNAME'))
             if self.instance is not None:
