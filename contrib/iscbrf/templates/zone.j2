@@ -1,5 +1,5 @@
 $ORIGIN {{ zone.name }}.
-$TTL {{ zone.ttl|default(86400) }}
+$TTL {{ zone.ttl|default(600) }}
 
 {{ zone.name }}. IN SOA {{ zone.soa.authns }}. {{ zone.soa.email }}. (
 		{{ serial }}
