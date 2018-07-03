@@ -32,9 +32,9 @@ except ImportError as e:
 class iscBonk(object):
 
     def __init__(self, config):
-        template_dir= 'templates/'
+        template_dir = 'templates/'
         if config.has_option('iscbrf', 'template_dir'):
-            config.get('iscbrf', 'template_dir')
+            template_dir = config.get('iscbrf', 'template_dir')
         self.named_template = os.path.join(template_dir, 'named.conf.j2')
         self.named_slave_template = os.path.join(template_dir, 'named-slave.conf.j2')
         self.dhcpd_template = os.path.join(template_dir, 'dhcpd.conf.j2')
