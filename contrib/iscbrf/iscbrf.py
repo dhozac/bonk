@@ -205,6 +205,9 @@ if __name__ == '__main__':
         if zone['name'].endswith(".arpa"):
             if zone['name'].endswith(".in-addr.arpa"):
                 network = ".".join(zone['name'].split(".")[:3][::-1]) + "."
+            elif zone['name'].endswith(".ip6.arpa"):
+                network = zone['name'].split(".")[:-2][::-1]
+                network = ":".join(["".join(network[i:i+4]) for i in range(0, len(network), 4)])
             ips = filter(lambda x: x['ip'].startswith(network), addresses)
         else:
             ips = filter(lambda x: x['name'].endswith('.' + zone['name']), addresses)
