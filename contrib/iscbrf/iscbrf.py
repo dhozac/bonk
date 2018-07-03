@@ -202,21 +202,27 @@ if __name__ == '__main__':
         zone['records'] = response.json()
 
     for zone in zones.values():
-        ips = filter(lambda x: x['name'].endswith('.' + zone['name']), addresses)
-        def find_or_max(name, zone):
-            try:
-                if not name.endswith('.' + zone):
-                    raise Exception('no match')
-                return name.index('.' + zone)
-            except:
-                return sys.maxsize
-        zone['records'].extend([{
-            'name': ip['name'],
-            'zone': zone['name'],
-            'type': 'A',
-            'value': [ip['ip']],
-            'ttl': ip.get('ttl', ''),
-        } for ip in ips if zone['name'] == sorted(zones.keys(), key=lambda z: find_or_max(ip['name'], z))[0]])
+        if zone['name'].endswith(".arpa"):
+            if zone['name'].endswith(".in-addr.arpa"):
+                network = ".".join(zone['name'].split(".")[:3][::-1]) + "."
+            ips = filter(lambda x: x['ip'].startswith(network), addresses)
+        else:
+            ips = filter(lambda x: x['name'].endswith('.' + zone['name']), addresses)
+            def find_or_max(name, zone):
+                try:
+                    if not name.endswith('.' + zone):
+                        raise Exception('no match')
+                    return name.index('.' + zone)
+                except:
+                    return sys.maxsize
+            zone['records'].extend([{
+                'name': ip['name'],
+                'zone': zone['name'],
+                'type': 'A',
+                'value': [ip['ip']],
+                'ttl': ip.get('ttl', ''),
+            } for ip in ips if zone['name'] == sorted(zones.keys(), key=lambda z: find_or_max(ip['name'], z))[0]])
+
         for ip in ips:
             reverse_name = dns.reversename.from_address(ip['ip'])
             reverse_zone = str(reverse_name.split(6)[1])[:-1]
@@ -224,13 +230,17 @@ if __name__ == '__main__':
                 continue
             if reverse_zone not in zones:
                 zones[reverse_zone] = {'name': reverse_zone, 'records': []}
-            zones[reverse_zone]['records'].append({
-                'name': str(reverse_name)[:-1],
-                'zone': reverse_zone,
-                'type': 'PTR',
-                'value': [ip['name'] + '.'],
-                'ttl': ip.get('ttl', ''),
-            })
+            for record in zones[reverse_zone]['records']:
+                if record['name'] == str(reverse_name)[:-1]:
+                    break
+            else:
+                zones[reverse_zone]['records'].append({
+                    'name': str(reverse_name)[:-1],
+                    'zone': reverse_zone,
+                    'type': 'PTR',
+                    'value': [ip['name'] + '.'],
+                    'ttl': ip.get('ttl', ''),
+                })
 
     flattened = []
     for zone in zones.itervalues():
