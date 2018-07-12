@@ -684,7 +684,7 @@ class APITests(TestCase):
         zone1 = self.create_zone(auth, 'my1.zone', permissions={'write': ['group1'], 'create': ['group2']}, needs_review=True)
 
         response = self._create_record(user2_auth, 'www.my1.zone', 'my1.zone', 'A', ['127.0.0.1'], permissions={'write': ['group2']})
-        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.status_code, 202)
         data = json.loads(response.content)
         self.assertEqual(data[0], 'review created')
 
