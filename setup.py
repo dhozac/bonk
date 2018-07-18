@@ -5,7 +5,7 @@ import os
 import re
 
 setup(name='bonk',
-      version='0.4.0',
+      version='0.4.1',
       license='Apache Software License',
       description='Simple IPAM',
       author='Klarna Bank AB',
