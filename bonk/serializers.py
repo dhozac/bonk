@@ -475,8 +475,10 @@ class DNSRecordSerializer(NeedsReviewMixin, BonkTriggerMixin, HistorySerializerM
         return self._zone.needs_review(self._zone.instance, {})
 
     def get_reviewers(self, instance, data):
-        return (super(DNSRecordSerializer, self).get_reviewers(instance, data) +
-            self._zone.get_reviewers(self._zone.instance, {}))
+        reviewers = self._zone.get_reviewers(self._zone.instance, {})
+        if instance is not None:
+            reviewers.extend(super(DNSRecordSerializer, self).get_reviewers(instance, data))
+        return reviewers
 
     def validate_zone(self, value):
         try:
