@@ -522,7 +522,7 @@ class DNSRecordSerializer(NeedsReviewMixin, BonkTriggerMixin, HistorySerializerM
                 raise serializers.ValidationError("a CNAME record exists for the specified name already")
         try:
             dns.zone.from_text(
-                "\n".join(["%s. IN %s %s" % (full['name'], full['type'], v) for v in full['value']]),
+                "\n".join(["%s. %d IN %s %s" % (full['name'], full.get('ttl', 86400), full['type'], v) for v in full['value']]),
                 origin=full['zone'], check_origin=False
             )
         except dns.exception.SyntaxError:
