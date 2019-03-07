@@ -79,7 +79,9 @@ class VRFSerializer(HistorySerializerMixin):
         ]
 
     def create_link(self, instance):
-        return reverse('bonk:vrf_detail', kwargs=instance, request=self.context.get('request'))
+        return reverse('bonk:vrf_detail', kwargs={
+                'vrf': instance['vrf']
+            }, request=self.context.get('request'))
 
 def validate_vrf(value):
     try:
@@ -111,7 +113,11 @@ class IPBlockSerializer(HistorySerializerMixin):
         ]
 
     def create_link(self, instance):
-        return reverse('bonk:block_detail', kwargs=instance, request=self.context.get('request'))
+        return reverse('bonk:block_detail', kwargs={
+                'vrf': instance['vrf'],
+                'network': instance['network'],
+                'length': instance['length'],
+            }, request=self.context.get('request'))
 
     @classmethod
     def get_by_ip(cls, vrf, ip, reql=False):
@@ -207,7 +213,11 @@ class IPPrefixSerializer(BonkTriggerMixin, HistorySerializerMixin):
         ]
 
     def create_link(self, instance):
-        return reverse('bonk:prefix_detail', kwargs=instance, request=self.context.get('request'))
+        return reverse('bonk:prefix_detail', kwargs={
+                'vrf': instance['vrf'],
+                'network': instance['network'],
+                'length': instance['length'],
+            }, request=self.context.get('request'))
 
     @classmethod
     def filter_by_block(cls, block, reql=False):
@@ -339,7 +349,10 @@ class IPAddressSerializer(BonkTriggerMixin, HistorySerializerMixin):
         ]
 
     def create_link(self, instance):
-        return reverse('bonk:address_detail', kwargs=instance, request=self.context.get('request'))
+        return reverse('bonk:address_detail', kwargs={
+                'vrf': instance['vrf'],
+                'ip': instance['ip'],
+            }, request=self.context.get('request'))
 
     @classmethod
     def filter_by_prefix(cls, prefix, reql=False):
@@ -486,7 +499,10 @@ class DNSRecordSerializer(NeedsReviewMixin, BonkTriggerMixin, HistorySerializerM
         ]
 
     def create_link(self, instance):
-        return reverse('bonk:record_detail', kwargs=instance, request=self.context.get('request'))
+        return reverse('bonk:record_detail', kwargs={
+                'name': instance['name'],
+                'type': instance['type'],
+            }, request=self.context.get('request'))
 
     def needs_review(self, instance, data):
         if not hasattr(self, '_zone'):
