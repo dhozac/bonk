@@ -223,7 +223,11 @@ class IPAddressListView(RethinkAPIMixin, generics.ListCreateAPIView):
     permission_classes = (permissions.IsAuthenticated,)
 
     def default_filter_queryset(self, queryset):
-        if self.request.user.is_superuser:
+        if self.request.user.is_superuser or (
+                hasattr(self.request.user, 'is_global_readonly') and
+                self.request.user.is_global_readonly and
+                self.request.method == 'GET'
+            ):
             return queryset
         groups = self.request.user.groups.all().values_list('name', flat=True)
         ip_addresses = reduce(lambda x, y: x.union(y),
@@ -267,7 +271,11 @@ class DNSRecordListView(RethinkAPIMixin, generics.ListCreateAPIView):
     permission_classes = (permissions.IsAuthenticated,)
 
     def default_filter_queryset(self, queryset):
-        if self.request.user.is_superuser:
+        if self.request.user.is_superuser or (
+                hasattr(self.request.user, 'is_global_readonly') and
+                self.request.user.is_global_readonly and
+                self.request.method == 'GET'
+            ):
             return queryset
         queryset = queryset. \
             merge(lambda record: {"zone_obj":
