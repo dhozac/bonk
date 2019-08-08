@@ -12,8 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import absolute_import
 import logging
 import uuid
+from functools import reduce
 import netaddr
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -113,7 +115,7 @@ class IPBlockAllocateView(RethinkAPIMixin, generics.CreateAPIView):
             else:
                 if larger is None:
                     raise serializers.ValidationError("IP block is exhausted")
-                prefix = larger.subnet(length).next()
+                prefix = next(larger.subnet(length))
             obj = {
                 'vrf': block['vrf'],
                 'network': str(prefix.network),

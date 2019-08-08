@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import absolute_import
 from django.conf import settings
 from django.contrib.auth.models import Group
 from rest_framework import serializers
@@ -264,7 +265,7 @@ class IPPrefixSerializer(BonkTriggerMixin, HistorySerializerMixin):
             groups = set(self.context['request'].user.groups.all().values_list('name', flat=True))
             if len(groups.intersection(allowed)) == 0:
                 raise serializers.ValidationError("you do not have permissions to block %s/%d" % (block['network'], block['length']))
-        underlappers = filter(lambda x: x[self.Meta.pk_field] != full.get(self.Meta.pk_field, None), self.filter_by_block(full))
+        underlappers = [x for x in self.filter_by_block(full) if x[self.Meta.pk_field] != full.get(self.Meta.pk_field, None)]
         if len(underlappers) > 0:
             raise serializers.ValidationError("prefix %s/%d overlaps with %r" % (full['network'], full['length'], underlappers))
         try:
@@ -541,7 +542,7 @@ class DNSRecordSerializer(NeedsReviewMixin, BonkTriggerMixin, HistorySerializerM
         if full['type'] == 'CNAME':
             records = list(DNSRecordSerializer.filter(name=full['name']))
             if self.instance is not None:
-                records = filter(lambda x: x['id'] != self.instance['id'], records)
+                records = [x for x in records if x['id'] != self.instance['id']]
             if len(records) > 0:
                 raise serializers.ValidationError("a CNAME record cannot be used on a name with any other record type")
             if len(full['value']) > 1:
@@ -552,7 +553,7 @@ class DNSRecordSerializer(NeedsReviewMixin, BonkTriggerMixin, HistorySerializerM
         else:
             records = list(DNSRecordSerializer.filter(name=full['name'], type='CNAME'))
             if self.instance is not None:
-                records = filter(lambda x: x['id'] != self.instance['id'], records)
+                records = [x for x in records if x['id'] != self.instance['id']]
             if len(records) > 0:
                 raise serializers.ValidationError("a CNAME record exists for the specified name already")
         try:

@@ -1,7 +1,11 @@
+from __future__ import absolute_import
 import requests
 import subprocess
 import logging
-import urlparse
+try:
+    from urllib.parse import urlparse, parse_qsl
+except ImportError:
+    from urlparse import urlparse, parse_qsl
 from celery import shared_task
 from django.conf import settings
 
@@ -39,7 +43,7 @@ def socrates_request(method, url, **kwargs):
 
 @shared_task
 def trigger_prefix_create(prefix, block):
-    url = urlparse.urlparse(block['announced_by'])
+    url = urlparse(block['announced_by'])
     if url.scheme == 'socrates' and prefix['state'] == 'allocated':
         domain = url.path.strip('/')
         response = socrates_request("get", "https://%s/asset/" % url.netloc,
@@ -85,7 +89,7 @@ def trigger_prefix_create(prefix, block):
                         switch_domains.add(nic['remote']['domain'])
 
         # Create network
-        data = dict(urlparse.parse_qsl(url.query))
+        data = dict(parse_qsl(url.query))
         domains = dict(
             [(domain, {'name': prefix['name'], 'vlan_id': 0, 'data': data})] +
             [(switch_domain, {'name': prefix['name'], 'vlan_id': 0})
@@ -106,7 +110,7 @@ def trigger_prefix_create(prefix, block):
 
 @shared_task
 def trigger_prefix_delete(prefix, block):
-    url = urlparse.urlparse(block['announced_by'])
+    url = urlparse(block['announced_by'])
     if url.scheme == 'socrates' and prefix['state'] == 'allocated':
         response = socrates_request("delete", "https://%s/network/%d/%s/%d/" %
             (url.netloc, prefix['vrf'], prefix['network'], prefix['length']))

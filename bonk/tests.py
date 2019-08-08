@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import absolute_import
 import base64
 import json
 import os
@@ -63,7 +64,7 @@ class APITests(TestCase):
         for name in groups:
             group, created = Group.objects.get_or_create(name=name)
             user.groups.add(group)
-        auth = "Basic %s" % (base64.b64encode("%s:%s" % (username, password)))
+        auth = "Basic %s" % (base64.b64encode(("%s:%s" % (username, password)).encode("ascii")).decode("ascii"))
         return auth
 
     def create_common_objects(self):
@@ -242,7 +243,7 @@ class APITests(TestCase):
         ip_block = self.create_ip_block(auth, 0, '10.0.0.0', 16, permissions={'create': ['group1']})
         response = self._allocate_ip_prefix(user1_auth, 0, '10.0.0.0', 16, name='prefix1', permissions={'write': ['group1']})
         self.assertEqual(response.status_code, 400)
-        self.assertIn('length', response.content)
+        self.assertIn(b'length', response.content)
 
     def test_ip_prefix_allocate_exhaustive(self):
         auth = self.create_common_objects()
@@ -252,7 +253,7 @@ class APITests(TestCase):
         ip_prefix2 = self.allocate_ip_prefix(user1_auth, 0, '10.0.0.0', 16, length=17, name='prefix2', permissions={'write': ['group1']})
         response = self._allocate_ip_prefix(user1_auth, 0, '10.0.0.0', 16, length=17, name='prefix3', permissions={'write': ['group1']})
         self.assertEqual(response.status_code, 400)
-        self.assertIn('exhausted', response.content)
+        self.assertIn(b'exhausted', response.content)
 
     def test_ip_prefix_allocate_no_permissions(self):
         auth = self.create_common_objects()
@@ -260,7 +261,7 @@ class APITests(TestCase):
         ip_block = self.create_ip_block(auth, 0, '10.0.0.0', 16, permissions={'create': ['group1']})
         response = self._allocate_ip_prefix(user1_auth, 0, '10.0.0.0', 16, length=17, name='prefix1')
         self.assertEqual(response.status_code, 400)
-        self.assertIn('permissions', response.content)
+        self.assertIn(b'permissions', response.content)
 
     def test_ip_prefix_no_block(self):
         auth = self.create_common_objects()
@@ -469,7 +470,7 @@ class APITests(TestCase):
             self.allocate_ip_address(user1_auth, ip_prefix1['vrf'], ip_prefix1['network'], ip_prefix1['length'], "ip%d.my.zone" % i)
         response = self._allocate_ip_address(user1_auth, ip_prefix1['vrf'], ip_prefix1['network'], ip_prefix1['length'], "ip-fail.my.zone")
         self.assertEqual(response.status_code, 400)
-        self.assertIn('exhausted', response.content)
+        self.assertIn(b'exhausted', response.content)
 
     def test_ip_address_allocate_specific(self):
         auth = self.create_common_objects()
@@ -480,7 +481,7 @@ class APITests(TestCase):
         self.allocate_ip_address(user1_auth, ip_prefix1['vrf'], ip_prefix1['network'], ip_prefix1['length'], "ip2.my.zone", ip='10.0.0.2')
         response = self._allocate_ip_address(user1_auth, ip_prefix1['vrf'], ip_prefix1['network'], ip_prefix1['length'], "ip2.my.zone", ip='10.0.0.2')
         self.assertEqual(response.status_code, 400)
-        self.assertIn('already in use', response.content)
+        self.assertIn(b'already in use', response.content)
 
     def test_ip_address_allocate_ttl(self):
         auth = self.create_common_objects()
