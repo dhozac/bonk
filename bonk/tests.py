@@ -663,6 +663,12 @@ class APITests(TestCase):
         data = json.loads(response.content)
         self.assertIn('non_field_errors', data)
 
+    def test_dns_records_aname(self):
+        auth = self.create_common_objects()
+        user1_auth = self.create_user('user1', is_superuser=False, groups=['group1'])
+        zone1 = self.create_zone(auth, 'my1.zone', permissions={'write': ['group1']})
+        self.create_record(user1_auth, 'service.my1.zone', 'my1.zone', 'ANAME', ['service.my2.zone'])
+
     def test_dns_record_detail(self):
         auth = self.create_common_objects()
         user1_auth = self.create_user('user1', is_superuser=False, groups=['group1'])
