@@ -75,6 +75,11 @@ curl -u $USER -XDELETE -H 'Content-Type: application/json' \
     https://server/bonk/block/0/10.1.0.0/16
 ```
 
+### Listing prefixes
+
+You can list all prefixes that you have permissions to see by
+issuing a `GET` to `/bonk/prefix/`.
+
 ### Allocate a prefix
 
 Allocating a prefix out of a block is the process of finding a free
@@ -176,6 +181,11 @@ curl -u $USER -XDELETE -H 'Content-Type: application/json' \
     https://server/bonk/prefix/0/10.1.255.0/24
 ```
 
+### Listing addresses
+
+You can list all addresses that you have permissions to see by
+issuing a `GET` to `/bonk/address/`.
+
 ### Allocate an address
 
 Allocating an address picks the first free address from the prefix,
@@ -234,6 +244,11 @@ curl -u $USER -XDELETE -H 'Content-Type: application/json' \
 ```
 
 ## DNS
+
+### Listing zones
+
+You can list all zones that you have permissions to see by issuing a
+`GET` to `/bonk/zone/`.
 
 ### Create a master zone
 
@@ -365,6 +380,11 @@ example:
 curl -u $USER -XDELETE -H 'Content-Type: application/json' \
     https://server/bonk/zone/slave.bonk.internal
 ```
+
+### Listing records
+
+You can list all records that you have permissions to see by issuing
+a `GET` to `/bonk/record/`.
 
 ### Create a record
 
