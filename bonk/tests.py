@@ -478,7 +478,7 @@ class APITests(TestCase):
     def test_ip_address_allocate_specific(self):
         auth = self.create_common_objects()
         user1_auth = self.create_user('user1', is_superuser=False, groups=['group1'])
-        ip_block = self.create_ip_block(auth, 0, '10.0.0.0', 16, 'block1' permissions={'create': ['group1']})
+        ip_block = self.create_ip_block(auth, 0, '10.0.0.0', 16, 'block1', permissions={'create': ['group1']})
         zone = self.create_zone(auth, 'my.zone', permissions={'write': ['group1']})
         ip_prefix1 = self.allocate_ip_prefix(user1_auth, 0, '10.0.0.0', 16, length=24, name='prefix1', permissions={'write': ['group1']})
         self.allocate_ip_address(user1_auth, ip_prefix1['vrf'], ip_prefix1['network'], ip_prefix1['length'], "ip2.my.zone", ip='10.0.0.2')
