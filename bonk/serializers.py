@@ -23,6 +23,7 @@ import re
 from django_rethink import r, RethinkSerializer, RethinkObjectNotFound, RethinkMultipleObjectsFound, validate_unique_key, get_connection, HistorySerializerMixin, NeedsReviewMixin, PermissionsSerializer
 from django_rethink.tasks import rethinkdb_lock, rethinkdb_unlock
 
+
 def validate_group_name(group_name):
     try:
         group = Group.objects.get(name=group_name)
@@ -37,6 +38,7 @@ def validate_group_name(group_name):
             if len(result) > 0:
                 return True
         raise serializers.ValidationError("group %s does not exist" % group_name)
+
 
 class BonkTriggerMixin(object):
     def create(self, data):
@@ -66,6 +68,7 @@ class BonkTriggerMixin(object):
         task.apply_async()
         return ret
 
+
 class VRFSerializer(HistorySerializerMixin):
     id = serializers.CharField(required=False)
     tags = serializers.DictField(required=False)
@@ -84,6 +87,7 @@ class VRFSerializer(HistorySerializerMixin):
                 'vrf': instance['vrf']
             }, request=self.context.get('request'))
 
+
 def validate_vrf(value):
     try:
         VRFSerializer.get(vrf=value)
@@ -91,10 +95,12 @@ def validate_vrf(value):
         raise serializers.ValidationError("vrf=%r doesn't exist" % value)
     return value
 
+
 class IPBlockSerializer(HistorySerializerMixin):
     id = serializers.CharField(required=False)
     tags = serializers.DictField(required=False)
     vrf = serializers.IntegerField(required=True, validators=[validate_vrf])
+    name = serializers.CharField(required=True)
     network = serializers.IPAddressField(required=True)
     length = serializers.IntegerField(required=True)
     announced_by = serializers.CharField(required=False)
@@ -104,10 +110,14 @@ class IPBlockSerializer(HistorySerializerMixin):
         table_name = 'ip_block'
         slug_field = 'vrf_network_length'
         indices = [
+            'name',
             ('vrf_network_length', (r.row['vrf'], r.row['network'], r.row['length'])),
             ('permissions_read', r.row['permissions']['read'], {'multi': True}),
             ('permissions_create', r.row['permissions']['create'], {'multi': True}),
             ('permissions_write', r.row['permissions']['write'], {'multi': True}),
+        ]
+        unique = [
+            'name'
         ]
         unique_together = [
             ('vrf', 'network', 'length'),
@@ -140,7 +150,7 @@ class IPBlockSerializer(HistorySerializerMixin):
     @classmethod
     def filter_by_block(cls, block, reql=False):
         return cls.filter(lambda b:
-            r.ip_prefix_contains(
+                r.ip_prefix_contains(
                 r.ip_prefix(block['network'], block['length']),
                 r.ip_address(b['network'])
             ), reql=reql)
@@ -152,6 +162,7 @@ class IPBlockSerializer(HistorySerializerMixin):
         if str(network.network) != full['network']:
             raise serializers.ValidationError("network is not the network address for %s/%d" % (full['network'], full['length']))
         return data
+
 
 class IPPrefixDHCPSerializer(serializers.Serializer):
     enabled = serializers.BooleanField(required=True)
@@ -171,14 +182,17 @@ class IPPrefixDHCPSerializer(serializers.Serializer):
             raise serializers.ValidationError("server_set=%r doesn't exist" % value)
         return value
 
+
 class DDNSSerializer(serializers.Serializer):
     name = serializers.CharField(required=True)
     algorithm = serializers.CharField(required=True)
     key = serializers.CharField(required=True)
 
+
 class IPPrefixDDNSSerializer(DDNSSerializer):
     zone = serializers.CharField(required=True)
     server = serializers.IPAddressField(required=True)
+
 
 class IPPrefixSerializer(BonkTriggerMixin, HistorySerializerMixin):
     id = serializers.CharField(required=False)
@@ -254,13 +268,13 @@ class IPPrefixSerializer(BonkTriggerMixin, HistorySerializerMixin):
             raise serializers.ValidationError("no block exists matching prefix %s/%d" % (full['network'], full['length']))
         if block['length'] > full['length']:
             raise serializers.ValidationError("prefix %s/%d exceeds block of %s/%d" % (full['network'], full['length'], block['network'], block['length']))
-        if (self.instance is None and
-                self.context['request'].user is not None and
-                not self.context['request'].user.is_superuser
+        if (self.instance is None
+                and self.context['request'].user is not None
+                and not self.context['request'].user.is_superuser
             ):
             allowed = set(
-                block.get('permissions', {}).get('write', []) +
-                block.get('permissions', {}).get('create', [])
+                block.get('permissions', {}).get('write', [])
+                + block.get('permissions', {}).get('create', [])
             )
             groups = set(self.context['request'].user.groups.all().values_list('name', flat=True))
             if len(groups.intersection(allowed)) == 0:
@@ -306,21 +320,25 @@ class IPPrefixSerializer(BonkTriggerMixin, HistorySerializerMixin):
         ret = super(IPPrefixSerializer, self).delete()
         return ret
 
+
 validate_mac_re = re.compile(r'^(?:[0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$')
 def validate_mac(value):
     if validate_mac_re.match(value) is None:
         raise serializers.ValidationError("%s is not a valid MAC address (format as de:ad:be:ef:f0:00)" % value)
+
 
 validate_fqdn_re = re.compile(r'^(([a-zA-Z0-9_][a-zA-Z0-9\-]*[a-zA-Z0-9]|[a-zA-Z0-9]|\*)\.)*([A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9])$')
 def validate_fqdn(value):
     if validate_fqdn_re.match(value) is None:
         raise serializers.ValidationError("%s is not a valid FQDN" % value)
 
+
 def validate_ttl(value):
     if value.bit_length() > 32:
         raise serializers.ValidationError("TTL can't be larger than 32 bits, value: %s" % value)
     if value < 0:
         raise serializers.ValidationError("TTL must be a positive value, value: %s")
+
 
 class IPAddressSerializer(BonkTriggerMixin, HistorySerializerMixin):
     id = serializers.CharField(required=False)
@@ -380,8 +398,8 @@ class IPAddressSerializer(BonkTriggerMixin, HistorySerializerMixin):
                 ))) > 0:
                 pass
             elif len(user_groups.intersection(set(
-                    zone.get('permissions', {}).get('create', []) +
-                    zone.get('permissions', {}).get('write', [])
+                    zone.get('permissions', {}).get('create', [])
+                    + zone.get('permissions', {}).get('write', [])
                 ))) == 0:
                 raise serializers.ValidationError("you do not have permission to create names in %s" % zone['name'])
         try:
@@ -401,11 +419,13 @@ class IPAddressSerializer(BonkTriggerMixin, HistorySerializerMixin):
             raise serializers.ValidationError("no prefix found for IP %s" % full['ip'])
         return data
 
+
 class DNSZoneOptionsSerializer(serializers.Serializer):
     ddns = DDNSSerializer(required=False)
     forwarders = serializers.ListField(child=serializers.IPAddressField(), required=False)
     notify = serializers.ListField(child=serializers.IPAddressField(), required=False)
     masters = serializers.ListField(child=serializers.IPAddressField(), required=False)
+
 
 class DNSSOASerializer(serializers.Serializer):
     authns = serializers.CharField(required=True)
@@ -414,6 +434,7 @@ class DNSSOASerializer(serializers.Serializer):
     retry = serializers.IntegerField(required=True)
     expiry = serializers.IntegerField(required=True)
     nxdomain = serializers.IntegerField(required=True)
+
 
 class DNSZoneSerializer(NeedsReviewMixin, BonkTriggerMixin, HistorySerializerMixin):
     id = serializers.CharField(required=False)
@@ -454,8 +475,8 @@ class DNSZoneSerializer(NeedsReviewMixin, BonkTriggerMixin, HistorySerializerMix
     def validate(self, data):
         data = super(DNSZoneSerializer, self).validate(data)
         if (self.instance is None and
-                self.context['request'].user is not None and
-                not self.context['request'].user.is_superuser
+                self.context['request'].user is not None
+                and not self.context['request'].user.is_superuser
             ):
             zones = DNSZoneSerializer.filter(type=data['type'])
             parent = {'name': '.'}
@@ -464,13 +485,14 @@ class DNSZoneSerializer(NeedsReviewMixin, BonkTriggerMixin, HistorySerializerMix
                     if len(zone['name']) > len(parent['name']):
                         parent = zone
             allowed = set(
-                parent.get('permissions', {}).get('write', []) +
-                parent.get('permissions', {}).get('create', [])
+                parent.get('permissions', {}).get('write', [])
+                + parent.get('permissions', {}).get('create', [])
             )
             groups = set(self.context['request'].user.groups.all().values_list('name', flat=True))
             if len(groups.intersection(allowed)) == 0:
                 raise serializers.ValidationError("you do not have permissions to zone %s" % (parent['name']))
         return data
+
 
 class DNSRecordSerializer(NeedsReviewMixin, BonkTriggerMixin, HistorySerializerMixin):
     id = serializers.CharField(required=False)
@@ -528,8 +550,8 @@ class DNSRecordSerializer(NeedsReviewMixin, BonkTriggerMixin, HistorySerializerM
                 ))) > 0:
                 pass
             elif len(user_groups.intersection(set(
-                    self._zone.instance.get('permissions', {}).get('create', []) +
-                    self._zone.instance.get('permissions', {}).get('write', [])
+                    self._zone.instance.get('permissions', {}).get('create', [])
+                    + self._zone.instance.get('permissions', {}).get('write', [])
                 ))) == 0:
                 raise serializers.ValidationError("you do not have permission to create names in %s" % value)
         return value
@@ -564,6 +586,7 @@ class DNSRecordSerializer(NeedsReviewMixin, BonkTriggerMixin, HistorySerializerM
         except dns.exception.SyntaxError:
             raise serializers.ValidationError("value is invalid")
         return data
+
 
 class DHCPServerSetSerializer(BonkTriggerMixin, HistorySerializerMixin):
     id = serializers.CharField(required=False)
