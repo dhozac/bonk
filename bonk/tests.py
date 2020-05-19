@@ -75,9 +75,10 @@ class APITests(TestCase):
         self.assertEqual(response.status_code, 201)
         return auth
 
-    def create_ip_block(self, auth, vrf, network, length, **fields):
+    def create_ip_block(self, auth, vrf, network, length, name, **fields):
         response = self.client.post(reverse('bonk:block_list'), data=json.dumps(dict(fields,
             vrf=vrf,
+            name=name,
             network=network,
             length=length,
         )), content_type="application/json", HTTP_AUTHORIZATION=auth)
@@ -160,7 +161,7 @@ class APITests(TestCase):
 
     def test_ip_block_get_by_ip(self):
         auth = self.create_common_objects()
-        ip_block = self.create_ip_block(auth, 0, '10.0.0.0', 16)
+        ip_block = self.create_ip_block(auth, 0, '10.0.0.0', 16, 'block1')
         self.assertEqual(IPBlockSerializer.get_by_ip(0, '10.0.0.0')['id'], ip_block['id'])
         self.assertEqual(IPBlockSerializer.get_by_ip(0, '10.0.255.255')['id'], ip_block['id'])
         with self.assertRaises(RethinkObjectNotFound):
@@ -172,6 +173,7 @@ class APITests(TestCase):
             'vrf': 1,
             'network': '10.0.0.0',
             'length': 16,
+            'name': 'block1'
         }), content_type="application/json", HTTP_AUTHORIZATION=auth)
         self.assertEqual(response.status_code, 400)
         self.assertIn('vrf', json.loads(response.content))
@@ -182,19 +184,20 @@ class APITests(TestCase):
             'vrf': 0,
             'network': '10.0.1.0',
             'length': 16,
+            'name': 'block1'
         }), content_type="application/json", HTTP_AUTHORIZATION=auth)
         self.assertEqual(response.status_code, 400)
         self.assertIn('non_field_errors', json.loads(response.content))
 
     def test_ip_prefix_invalid_vrf(self):
         auth = self.create_common_objects()
-        ip_block = self.create_ip_block(auth, 0, '10.0.0.0', 16)
+        ip_block = self.create_ip_block(auth, 0, '10.0.0.0', 16, 'block1')
         response = self._allocate_ip_prefix(auth, 1, '10.0.0.0', 16, length=24, name='prefix1', permissions={})
         self.assertEqual(response.status_code, 404)
 
     def test_ip_prefix_get_by_ip(self):
         auth = self.create_common_objects()
-        ip_block = self.create_ip_block(auth, 0, '10.0.0.0', 16)
+        ip_block = self.create_ip_block(auth, 0, '10.0.0.0', 16, 'block1')
         ip_prefix = self.create_ip_prefix(auth, 0, '10.0.1.0', 24, 'prefix1')
         self.assertEqual(IPPrefixSerializer.get_by_ip(0, '10.0.1.0')['id'], ip_prefix['id'])
         self.assertEqual(IPPrefixSerializer.get_by_ip(0, '10.0.1.255')['id'], ip_prefix['id'])
@@ -207,7 +210,7 @@ class APITests(TestCase):
         auth = self.create_common_objects()
         user1_auth = self.create_user('user1', is_superuser=False, groups=['group1'])
         user2_auth = self.create_user('user2', is_superuser=False, groups=['group2'])
-        ip_block = self.create_ip_block(auth, 0, '10.0.0.0', 16, permissions={'create': ['group1', 'group2']})
+        ip_block = self.create_ip_block(auth, 0, '10.0.0.0', 16, 'block1', permissions={'create': ['group1', 'group2']})
         ip_prefix1 = self.allocate_ip_prefix(user1_auth, 0, '10.0.0.0', 16, length=24, name='prefix1', permissions={'write': ['group1']})
         ip_prefix2 = self.allocate_ip_prefix(user2_auth, 0, '10.0.0.0', 16, length=24, name='prefix2', permissions={'write': ['group2']})
 
@@ -226,21 +229,21 @@ class APITests(TestCase):
     def test_ip_prefix_allocate_forbidden(self):
         auth = self.create_common_objects()
         user1_auth = self.create_user('user1', is_superuser=False, groups=['group1'])
-        ip_block = self.create_ip_block(auth, 0, '10.0.0.0', 16, permissions={})
+        ip_block = self.create_ip_block(auth, 0, '10.0.0.0', 16, 'block1', permissions={})
         response = self._allocate_ip_prefix(user1_auth, 0, '10.0.0.0', 16, length=24, name='prefix1', permissions={'write': ['group1']})
         self.assertEqual(response.status_code, 403)
 
     def test_ip_prefix_allocate_hosts(self):
         auth = self.create_common_objects()
         user1_auth = self.create_user('user1', is_superuser=False, groups=['group1'])
-        ip_block = self.create_ip_block(auth, 0, '10.0.0.0', 16, permissions={'create': ['group1']})
+        ip_block = self.create_ip_block(auth, 0, '10.0.0.0', 16, 'block1', permissions={'create': ['group1']})
         ip_prefix1 = self.allocate_ip_prefix(user1_auth, 0, '10.0.0.0', 16, hosts=13, name='prefix1', permissions={'write': ['group1']})
         self.assertEqual(ip_prefix1['length'], 28)
 
     def test_ip_prefix_allocate_nothing(self):
         auth = self.create_common_objects()
         user1_auth = self.create_user('user1', is_superuser=False, groups=['group1'])
-        ip_block = self.create_ip_block(auth, 0, '10.0.0.0', 16, permissions={'create': ['group1']})
+        ip_block = self.create_ip_block(auth, 0, '10.0.0.0', 16, 'block1', permissions={'create': ['group1']})
         response = self._allocate_ip_prefix(user1_auth, 0, '10.0.0.0', 16, name='prefix1', permissions={'write': ['group1']})
         self.assertEqual(response.status_code, 400)
         self.assertIn(b'length', response.content)
@@ -248,7 +251,7 @@ class APITests(TestCase):
     def test_ip_prefix_allocate_exhaustive(self):
         auth = self.create_common_objects()
         user1_auth = self.create_user('user1', is_superuser=False, groups=['group1'])
-        ip_block = self.create_ip_block(auth, 0, '10.0.0.0', 16, permissions={'create': ['group1']})
+        ip_block = self.create_ip_block(auth, 0, '10.0.0.0', 16, 'block1', permissions={'create': ['group1']})
         ip_prefix1 = self.allocate_ip_prefix(user1_auth, 0, '10.0.0.0', 16, length=17, name='prefix1', permissions={'write': ['group1']})
         ip_prefix2 = self.allocate_ip_prefix(user1_auth, 0, '10.0.0.0', 16, length=17, name='prefix2', permissions={'write': ['group1']})
         response = self._allocate_ip_prefix(user1_auth, 0, '10.0.0.0', 16, length=17, name='prefix3', permissions={'write': ['group1']})
@@ -258,7 +261,7 @@ class APITests(TestCase):
     def test_ip_prefix_allocate_no_permissions(self):
         auth = self.create_common_objects()
         user1_auth = self.create_user('user1', is_superuser=False, groups=['group1'])
-        ip_block = self.create_ip_block(auth, 0, '10.0.0.0', 16, permissions={'create': ['group1']})
+        ip_block = self.create_ip_block(auth, 0, '10.0.0.0', 16, 'block1', permissions={'create': ['group1']})
         response = self._allocate_ip_prefix(user1_auth, 0, '10.0.0.0', 16, length=17, name='prefix1')
         self.assertEqual(response.status_code, 400)
         self.assertIn(b'permissions', response.content)
@@ -277,7 +280,7 @@ class APITests(TestCase):
 
     def test_ip_prefix_larger_than_block(self):
         auth = self.create_common_objects()
-        ip_block = self.create_ip_block(auth, 0, '10.0.0.0', 16, permissions={})
+        ip_block = self.create_ip_block(auth, 0, '10.0.0.0', 16, 'block1', permissions={})
         response = self.client.post(reverse('bonk:prefix_list'), data=json.dumps({
             'vrf': 0,
             'network': '10.0.0.0',
@@ -290,7 +293,7 @@ class APITests(TestCase):
 
     def test_ip_prefix_overlap(self):
         auth = self.create_common_objects()
-        ip_block = self.create_ip_block(auth, 0, '10.0.0.0', 16, allocators=[])
+        ip_block = self.create_ip_block(auth, 0, '10.0.0.0', 16, 'block1', allocators=[])
         response = self.client.post(reverse('bonk:prefix_list'), data=json.dumps({
             'vrf': 0,
             'network': '10.0.0.0',
@@ -311,7 +314,7 @@ class APITests(TestCase):
 
     def test_ip_prefix_underlap(self):
         auth = self.create_common_objects()
-        ip_block = self.create_ip_block(auth, 0, '10.0.0.0', 16, allocators=[])
+        ip_block = self.create_ip_block(auth, 0, '10.0.0.0', 16, 'block1', allocators=[])
         response = self.client.post(reverse('bonk:prefix_list'), data=json.dumps({
             'vrf': 0,
             'network': '10.0.0.128',
@@ -332,7 +335,7 @@ class APITests(TestCase):
 
     def test_ip_prefix_invalid_network(self):
         auth = self.create_common_objects()
-        ip_block = self.create_ip_block(auth, 0, '10.0.0.0', 16, allocators=[])
+        ip_block = self.create_ip_block(auth, 0, '10.0.0.0', 16, 'block1', allocators=[])
         response = self.client.post(reverse('bonk:prefix_list'), data=json.dumps({
             'vrf': 0,
             'network': '10.0.0.128',
@@ -345,12 +348,12 @@ class APITests(TestCase):
 
     def test_ip_prefix_high_ip(self):
         auth = self.create_common_objects()
-        ip_block = self.create_ip_block(auth, 0, '128.0.0.0', 24)
+        ip_block = self.create_ip_block(auth, 0, '128.0.0.0', 24, 'block1')
         ip_prefix1 = self.allocate_ip_prefix(auth, 0, '128.0.0.0', 24, length=28, name='prefix1', permissions={})
 
     def test_create_prefix_without_permission(self):
         auth = self.create_common_objects()
-        ip_block = self.create_ip_block(auth, 0, '10.0.0.0', 16, permissions={})
+        ip_block = self.create_ip_block(auth, 0, '10.0.0.0', 16, 'block1', permissions={})
         user1_auth = self.create_user('user1', is_superuser=False, groups=['group1'])
         response = self.client.post(reverse('bonk:prefix_list'), data=json.dumps({
             'vrf': 0,
@@ -368,7 +371,7 @@ class APITests(TestCase):
         auth = self.create_common_objects()
         user1_auth = self.create_user('user1', is_superuser=False, groups=['group1'])
         user2_auth = self.create_user('user2', is_superuser=False, groups=['group2'])
-        ip_block = self.create_ip_block(auth, 0, '10.0.0.0', 16, permissions={'create': ['group1', 'group2']})
+        ip_block = self.create_ip_block(auth, 0, '10.0.0.0', 16, 'block1', permissions={'create': ['group1', 'group2']})
         zone = self.create_zone(auth, 'my.zone', permissions={'write': ['group1', 'group2']})
         ip_prefix1 = self.allocate_ip_prefix(user1_auth, 0, '10.0.0.0', 16, length=24, name='prefix1', permissions={'write': ['group1']})
         ip_prefix2 = self.allocate_ip_prefix(user2_auth, 0, '10.0.0.0', 16, length=24, name='prefix2', permissions={'write': ['group2']})
@@ -392,7 +395,7 @@ class APITests(TestCase):
     def test_ip_address_allocate_no_zone(self):
         auth = self.create_common_objects()
         user1_auth = self.create_user('user1', is_superuser=False, groups=['group1'])
-        ip_block = self.create_ip_block(auth, 0, '10.0.0.0', 16, permissions={'create': ['group1']})
+        ip_block = self.create_ip_block(auth, 0, '10.0.0.0', 16, 'block1', permissions={'create': ['group1']})
         ip_prefix1 = self.allocate_ip_prefix(user1_auth, 0, '10.0.0.0', 16, length=24, name='prefix1', permissions={'write': ['group1']})
         response = self._allocate_ip_address(user1_auth, 0, ip_prefix1['network'], ip_prefix1['length'], 'test1.my.zone')
         self.assertEqual(response.status_code, 400)
@@ -403,7 +406,7 @@ class APITests(TestCase):
     def test_ip_address_allocate_no_zone_permission(self):
         auth = self.create_common_objects()
         user1_auth = self.create_user('user1', is_superuser=False, groups=['group1'])
-        ip_block = self.create_ip_block(auth, 0, '10.0.0.0', 16, permissions={'create': ['group1']})
+        ip_block = self.create_ip_block(auth, 0, '10.0.0.0', 16, 'block1', permissions={'create': ['group1']})
         ip_prefix1 = self.allocate_ip_prefix(user1_auth, 0, '10.0.0.0', 16, length=24, name='prefix1', permissions={'write': ['group1']})
         zone = self.create_zone(auth, 'my.zone', permissions={})
         response = self._allocate_ip_address(user1_auth, 0, ip_prefix1['network'], ip_prefix1['length'], 'test1.my.zone')
@@ -415,7 +418,7 @@ class APITests(TestCase):
     def test_ip_address_allocate_duplicate_name(self):
         auth = self.create_common_objects()
         user1_auth = self.create_user('user1', is_superuser=False, groups=['group1'])
-        ip_block = self.create_ip_block(auth, 0, '10.0.0.0', 16, permissions={'create': ['group1']})
+        ip_block = self.create_ip_block(auth, 0, '10.0.0.0', 16, 'block1', permissions={'create': ['group1']})
         ip_prefix1 = self.allocate_ip_prefix(user1_auth, 0, '10.0.0.0', 16, length=24, name='prefix1', permissions={'write': ['group1']})
         zone = self.create_zone(auth, 'my.zone', permissions={'write': ['group1']})
         ip1 = self.allocate_ip_address(user1_auth, 0, ip_prefix1['network'], ip_prefix1['length'], 'test1.my.zone')
@@ -427,7 +430,7 @@ class APITests(TestCase):
 
     def test_ip_address_create_no_prefix(self):
         auth = self.create_common_objects()
-        ip_block = self.create_ip_block(auth, 0, '10.0.0.0', 16, permissions={})
+        ip_block = self.create_ip_block(auth, 0, '10.0.0.0', 16, 'block1', permissions={})
         user1_auth = self.create_user('user1', is_superuser=False, groups=['group1'])
         zone = self.create_zone(auth, 'my.zone', permissions={'create': ['group1']})
         response = self.client.post(reverse('bonk:address_list'), data=json.dumps({
@@ -444,7 +447,7 @@ class APITests(TestCase):
     def test_ip_address_allocate_no_name(self):
         auth = self.create_common_objects()
         user1_auth = self.create_user('user1', is_superuser=False, groups=['group1'])
-        ip_block = self.create_ip_block(auth, 0, '10.0.0.0', 16, permissions={'create': ['group1']})
+        ip_block = self.create_ip_block(auth, 0, '10.0.0.0', 16, 'block1', permissions={'create': ['group1']})
         zone = self.create_zone(auth, 'my.zone', permissions={'create': ['group1']})
         ip_prefix1 = self.allocate_ip_prefix(user1_auth, 0, '10.0.0.0', 16, length=24, name='prefix1', permissions={'write': ['group1']})
         response = self.client.post(reverse('bonk:prefix_allocate', kwargs={
@@ -463,7 +466,7 @@ class APITests(TestCase):
     def test_ip_address_allocate_exhaustive(self):
         auth = self.create_common_objects()
         user1_auth = self.create_user('user1', is_superuser=False, groups=['group1'])
-        ip_block = self.create_ip_block(auth, 0, '10.0.0.0', 16, permissions={'create': ['group1']})
+        ip_block = self.create_ip_block(auth, 0, '10.0.0.0', 16, 'block1', permissions={'create': ['group1']})
         zone = self.create_zone(auth, 'my.zone', permissions={'write': ['group1']})
         ip_prefix1 = self.allocate_ip_prefix(user1_auth, 0, '10.0.0.0', 16, length=28, name='prefix1', permissions={'write': ['group1']})
         for i in range(0, 14):
@@ -475,7 +478,7 @@ class APITests(TestCase):
     def test_ip_address_allocate_specific(self):
         auth = self.create_common_objects()
         user1_auth = self.create_user('user1', is_superuser=False, groups=['group1'])
-        ip_block = self.create_ip_block(auth, 0, '10.0.0.0', 16, permissions={'create': ['group1']})
+        ip_block = self.create_ip_block(auth, 0, '10.0.0.0', 16, 'block1' permissions={'create': ['group1']})
         zone = self.create_zone(auth, 'my.zone', permissions={'write': ['group1']})
         ip_prefix1 = self.allocate_ip_prefix(user1_auth, 0, '10.0.0.0', 16, length=24, name='prefix1', permissions={'write': ['group1']})
         self.allocate_ip_address(user1_auth, ip_prefix1['vrf'], ip_prefix1['network'], ip_prefix1['length'], "ip2.my.zone", ip='10.0.0.2')
@@ -486,7 +489,7 @@ class APITests(TestCase):
     def test_ip_address_allocate_ttl(self):
         auth = self.create_common_objects()
         user1_auth = self.create_user('user1', is_superuser=False, groups=['group1'])
-        ip_block = self.create_ip_block(auth, 0, '10.0.0.0', 16, permissions={'create': ['group1']})
+        ip_block = self.create_ip_block(auth, 0, '10.0.0.0', 16, 'block1', permissions={'create': ['group1']})
         zone = self.create_zone(auth, 'my.zone', permissions={'write': ['group1']})
         ip_prefix1 = self.allocate_ip_prefix(user1_auth, 0, '10.0.0.0', 16, length=24, name='prefix1', permissions={'write': ['group1']})
         response = self.client.post(reverse('bonk:prefix_allocate', kwargs={
@@ -508,7 +511,7 @@ class APITests(TestCase):
         auth = self.create_common_objects()
         user1_auth = self.create_user('user1', is_superuser=False, groups=['group1'])
         user2_auth = self.create_user('user2', is_superuser=False, groups=['group2'])
-        ip_block = self.create_ip_block(auth, 0, '10.0.0.0', 16, permissions={'create': ['group1']})
+        ip_block = self.create_ip_block(auth, 0, '10.0.0.0', 16, 'block1', permissions={'create': ['group1']})
         ip_prefix1 = self.allocate_ip_prefix(user1_auth, 0, '10.0.0.0', 16, length=24, name='prefix1', permissions={'write': ['group1']})
         zone = self.create_zone(auth, 'my.zone', permissions={'write': ['group1']})
         ip1 = self.allocate_ip_address(user1_auth, 0, ip_prefix1['network'], ip_prefix1['length'], 'test1.my.zone')
