@@ -100,11 +100,11 @@ class IPBlockSerializer(HistorySerializerMixin):
     id = serializers.CharField(required=False)
     tags = serializers.DictField(required=False)
     vrf = serializers.IntegerField(required=True, validators=[validate_vrf])
-    name = serializers.CharField(required=True)
     network = serializers.IPAddressField(required=True)
     length = serializers.IntegerField(required=True)
     announced_by = serializers.CharField(required=False)
     permissions = PermissionsSerializer(required=False)
+    name = serializers.CharField(required=True)
 
     class Meta(RethinkSerializer.Meta):
         table_name = 'ip_block'
@@ -150,7 +150,7 @@ class IPBlockSerializer(HistorySerializerMixin):
     @classmethod
     def filter_by_block(cls, block, reql=False):
         return cls.filter(lambda b:
-                r.ip_prefix_contains(
+            r.ip_prefix_contains(
                 r.ip_prefix(block['network'], block['length']),
                 r.ip_address(b['network'])
             ), reql=reql)
