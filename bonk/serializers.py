@@ -317,6 +317,9 @@ class IPPrefixSerializer(BonkTriggerMixin, HistorySerializerMixin):
         block = IPBlockSerializer.get_by_ip(self.instance['vrf'], self.instance['network'])
         if 'announced_by' in block and self.instance['state'] == 'allocated':
             bonk.tasks.trigger_prefix_delete.apply_async((self.instance, block))
+        for address in IPAddressSerializer.filter_by_prefix(self.instance):
+            ip = IPAddressSerializer(address)
+            ip.delete()
         ret = super(IPPrefixSerializer, self).delete()
         return ret
 

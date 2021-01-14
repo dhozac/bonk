@@ -351,6 +351,21 @@ class APITests(TestCase):
         ip_block = self.create_ip_block(auth, 0, '128.0.0.0', 24, 'block1')
         ip_prefix1 = self.allocate_ip_prefix(auth, 0, '128.0.0.0', 24, length=28, name='prefix1', permissions={})
 
+    def test_ip_prefix_delete_addresses(self):
+        auth = self.create_common_objects()
+        ip_block = self.create_ip_block(auth, 0, '10.0.0.0', 16)
+        ip_prefix = self.allocate_ip_prefix(auth, 0, '10.0.0.0', 16, length=24, name='prefix1', permissions={})
+        zone = self.create_zone(auth, 'my.zone')
+        ip1 = self.allocate_ip_address(auth, 0, ip_prefix['network'], ip_prefix['length'], 'test1.my.zone', permissions={})
+        response = self.client.delete(reverse('bonk:prefix_detail', kwargs={
+                'vrf': ip_prefix['vrf'], 'network': ip_prefix['network'], 'length': ip_prefix['length']
+            }), HTTP_AUTHORIZATION=auth)
+        self.assertEqual(response.status_code, 204)
+        response = self.client.get(reverse('bonk:address_list'), HTTP_AUTHORIZATION=auth)
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.content)
+        self.assertEqual(len(data), 0)
+
     def test_create_prefix_without_permission(self):
         auth = self.create_common_objects()
         ip_block = self.create_ip_block(auth, 0, '10.0.0.0', 16, 'block1', permissions={})
