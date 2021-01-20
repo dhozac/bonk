@@ -353,7 +353,7 @@ class APITests(TestCase):
 
     def test_ip_prefix_delete_addresses(self):
         auth = self.create_common_objects()
-        ip_block = self.create_ip_block(auth, 0, '10.0.0.0', 16)
+        ip_block = self.create_ip_block(auth, 0, '10.0.0.0', 16, 'block1')
         ip_prefix = self.allocate_ip_prefix(auth, 0, '10.0.0.0', 16, length=24, name='prefix1', permissions={})
         zone = self.create_zone(auth, 'my.zone')
         ip1 = self.allocate_ip_address(auth, 0, ip_prefix['network'], ip_prefix['length'], 'test1.my.zone', permissions={})
