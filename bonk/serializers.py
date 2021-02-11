@@ -499,6 +499,7 @@ class DNSZoneSerializer(NeedsReviewMixin, BonkTriggerMixin, HistorySerializerMix
 
 class DNSRecordSerializer(NeedsReviewMixin, BonkTriggerMixin, HistorySerializerMixin):
     id = serializers.CharField(required=False)
+    tags = serializers.DictField(required=False)
     name = serializers.CharField(required=True, validators=[validate_fqdn])
     zone = serializers.CharField(required=True)
     type = serializers.ChoiceField(choices=['A', 'AAAA', 'CNAME', 'MX', 'NS', 'PTR', 'SRV', 'TXT', 'CAA', 'ANAME'], required=True)
