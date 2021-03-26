@@ -672,6 +672,15 @@ class APITests(TestCase):
         data = json.loads(response.content)
         self.assertIn('non_field_errors', data)
 
+    def test_dns_records_cname_url(self):
+        auth = self.create_common_objects()
+        user1_auth = self.create_user('user1', is_superuser=False, groups=['group1'])
+        zone1 = self.create_zone(auth, 'my1.zone', permissions={'write': ['group1']})
+        response = self._create_record(user1_auth, 'service.my1.zone', 'my1.zone', 'CNAME', ['https://my.website'])
+        self.assertEqual(response.status_code, 400)
+        data = json.loads(response.content)
+        self.assertIn('non_field_errors', data)
+
     def test_dns_records_invalid_a(self):
         auth = self.create_common_objects()
         user1_auth = self.create_user('user1', is_superuser=False, groups=['group1'])

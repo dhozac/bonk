@@ -576,6 +576,8 @@ class DNSRecordSerializer(NeedsReviewMixin, BonkTriggerMixin, HistorySerializerM
             addresses = list(IPAddressSerializer.filter(name=full['name']))
             if len(addresses) > 0:
                 raise serializers.ValidationError("an address with the same name already exists")
+
+            validate_fqdn(full['value'][0].rstrip("."))
         else:
             records = list(DNSRecordSerializer.filter(name=full['name'], type='CNAME'))
             if self.instance is not None:
